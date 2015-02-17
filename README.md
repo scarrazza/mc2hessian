@@ -24,7 +24,6 @@ $ source activate myenv
 ```Shell
 $ ./mc2hessian.py --help
    usage: ./mc2hessian [PDF LHAPDF set] [Number of replicas] [Input energy] [OPTIONAL: replicas for base file]
-
 ```
 
 The output of this script is a hessian set of PDF in the LHAPDF6 format.
