@@ -25,7 +25,7 @@ class LocalPDF:
         self.xgrid = xgrid
         self.xfxQ = numpy.zeros(shape=(self.n_rep, fl.n, xgrid.n))
         self.base = numpy.zeros(shape=self.n_rep, dtype=numpy.int32)
-        
+
         if rep_base != "":
             print "- Using custom basis"
             f = open(rep_base, 'rb')
@@ -175,6 +175,9 @@ def load_replica(rep, pdf_name):
         text = inn.readline()
         header += text
         if text.find("---") >= 0: done = True
+
+    if rep != 0:
+    	header = header.replace('replica', 'error')
 
     xtext = []
     qtext = []
