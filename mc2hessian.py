@@ -35,6 +35,7 @@ class LocalPDF:
             for l in f.readlines():
                 if ind >= nrep:
                     print " [Warning] Basis file contains more replicas than expected", nrep
+                    break
                 fin[ind] = int(l)
                 ind+=1
             fin = numpy.sort(fin)
