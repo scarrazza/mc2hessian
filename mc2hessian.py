@@ -226,18 +226,22 @@ def parallelrep(i, nrep, pdf, pdf_name, file, path, xs0, qs0, fs0, vec, store_xf
     elif i < 1000:
         suffix = "0" + str(i)
     else: suffix = str(i)
-
+    
     print " -> Writing replica", i
     header, xs, qs, fs = load_replica(pdf.base[i-1], path + "/" + pdf_name)
+    
     if xs != xs0 or qs != qs0 or fs != fs0:
-        print " Resetting stored PDF, different grids for PDF replica."
-        store_xfxQ = []
-        rep0 = []
-
+        print " Different grids for PDF replica. Using replica 0 grid."
+        #store_xfxQ_local = []
+        #rep0_local = []    
+        xs = xs0
+        qs = qs0
+        fs = fs0
+    
     out = open(file + "/" + pdf_name + "_hessian_" + str(nrep) + "_" + suffix + ".dat", 'wb')
 
     out.write(header)
-
+    
     for sub in range(len(xs)):
         out.write(xs[sub])
         out.write(qs[sub])
@@ -249,14 +253,16 @@ def parallelrep(i, nrep, pdf, pdf_name, file, path, xs0, qs0, fs0, vec, store_xf
         xval = [float(ii) for ii in xval]
         qval = [float(ii) for ii in qval]
         fval = [int(ii)   for ii in fval]
-
-            # precache PDF grids
+        
+        """
+        # precache PDF grids
         if xs != xs0 or qs != qs0 or fs != fs0:
-            res = numpy.zeros(shape=(pdf.n_rep, len(fval), len(xval), len(qval)))
-            for r in range(pdf.n_rep):
+            res = numpy.zeros(shape=(nrep, len(fval), len(xval), len(qval)))
+            for r in range(nrep):
                 res[r] = precachepdf(pdf.pdf[pdf.base[r]].xfxQ, fval, xval, qval)
             store_xfxQ.append(res)
             rep0.append(precachepdf(pdf.pdf[0].xfxQ, fval, xval, qval))
+        """
 
         F = numpy.zeros(shape=(len(fval), len(xval), len(qval)))
         dumptofile(F, xval, qval, fval, vec[i-1], store_xfxQ[sub], rep0[sub])
@@ -394,8 +400,8 @@ def main(argv):
         fval = [int(i)   for i in fval]
 
         # precache PDF grids
-        res = numpy.zeros(shape=(pdf.n_rep, len(fval), len(xval), len(qval)))
-        for r in range(pdf.n_rep):
+        res = numpy.zeros(shape=(nrep, len(fval), len(xval), len(qval)))
+        for r in range(nrep):
             res[r] = precachepdf(pdf.pdf[pdf.base[r]].xfxQ, fval, xval, qval)
         store_xfxQ.append(res)
 
