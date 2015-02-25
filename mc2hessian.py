@@ -67,7 +67,10 @@ class LocalPDF:
                     self.xfxQ[r, f, ix] = self.pdf[self.base[r]].xfxQ(fl.id[f], xgrid.x[ix], Q)
 
         # precomputing averages
-        self.f0 = numpy.mean(self.xfxQ, axis=0)
+        self.f0 = numpy.zeros(shape=(fl.n, xgrid.n))
+        for f in range(fl.n):
+            for ix in range(xgrid.n):
+                self.f0[f, ix] = self.pdf[0].xfxQ(fl.id[f], xgrid.x[ix], Q)
 
     @jit
     def fill_cov(self, nf, nx, xfxQ, f0):
@@ -253,7 +256,7 @@ def parallelrep(i, nrep, pdf, pdf_name, file, path, xs0, qs0, fs0, vec, store_xf
             for r in range(pdf.n_rep):
                 res[r] = precachepdf(pdf.pdf[pdf.base[r]].xfxQ, fval, xval, qval)
             store_xfxQ.append(res)
-            rep0.append(numpy.mean(store_xfxQ[sub], axis=0))
+            rep0.append(precachepdf(pdf.pdf[0].xfxQ, fval, xval, qval))
 
         F = numpy.zeros(shape=(len(fval), len(xval), len(qval)))
         dumptofile(F, xval, qval, fval, vec[i-1], store_xfxQ[sub], rep0[sub])
@@ -397,7 +400,7 @@ def main(argv):
         store_xfxQ.append(res)
 
         # compute replica 0
-        rep0.append(numpy.mean(store_xfxQ[sub], axis=0))
+        rep0.append(precachepdf(pdf.pdf[0].xfxQ, fval, xval, qval))
 
         for ix in range(len(xval)):
             for iq in range(len(qval)):
