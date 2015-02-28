@@ -181,7 +181,7 @@ def load_replica(rep, pdf_name):
         if text.find("---") >= 0: done = True
 
     if rep != 0:
-    	header = header.replace('replica', 'error')
+        header = header.replace('replica', 'error')
 
     xtext = []
     qtext = []
@@ -226,22 +226,22 @@ def parallelrep(i, nrep, pdf, pdf_name, file, path, xs0, qs0, fs0, vec, store_xf
     elif i < 1000:
         suffix = "0" + str(i)
     else: suffix = str(i)
-    
+
     print " -> Writing replica", i
     header, xs, qs, fs = load_replica(pdf.base[i-1], path + "/" + pdf_name)
-    
+
     if xs != xs0 or qs != qs0 or fs != fs0:
         print " Different grids for PDF replica. Using replica 0 grid."
         #store_xfxQ_local = []
-        #rep0_local = []    
+        #rep0_local = []
         xs = xs0
         qs = qs0
         fs = fs0
-    
+
     out = open(file + "/" + pdf_name + "_hessian_" + str(nrep) + "_" + suffix + ".dat", 'wb')
 
     out.write(header)
-    
+
     for sub in range(len(xs)):
         out.write(xs[sub])
         out.write(qs[sub])
@@ -253,7 +253,7 @@ def parallelrep(i, nrep, pdf, pdf_name, file, path, xs0, qs0, fs0, vec, store_xf
         xval = [float(ii) for ii in xval]
         qval = [float(ii) for ii in qval]
         fval = [int(ii)   for ii in fval]
-        
+
         """
         # precache PDF grids
         if xs != xs0 or qs != qs0 or fs != fs0:
@@ -339,7 +339,8 @@ def main(argv):
 
     # Step 5: quick test
     print "\n- Quick test:"
-    for f in range(1):
+    est = 0
+    for f in fl.id:
         for x in xgrid.x:
             sum = 0
             sq_sum = 0
@@ -360,6 +361,9 @@ def main(argv):
             print "1-sigma MonteCarlo:",f, x, t0
             print "1-sigma Hessian   :", f, x,  t1
             print "Ratio:", t1/t0
+
+            if t0 != 0: est += abs((t1-t0)/t0)
+    print "Estimator:", est
 
     # Step 6: exporting to LHAPDF
     path = lhapdf.paths()[0] + "/" + pdf_name
