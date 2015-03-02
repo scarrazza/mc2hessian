@@ -44,7 +44,7 @@ class LocalPDF:
             print fin
 
             ind = 0
-            negative = numpy.zeros(shape=(self.n_rep-nrep+1), dtype=numpy.int32)
+            negative = numpy.zeros(shape=(self.n_rep-nrep+1), dtype=numpy.int64)
             for i in range(self.n_rep):
 
                 it = False
