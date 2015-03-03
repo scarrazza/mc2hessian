@@ -48,9 +48,7 @@ def main(argv):
     print " [Done] "
 
     # Step 2: determine the best an for each replica
-    if pdf.n_rep % 10 != 0:
-        print " [Warning] subsystem size is not multiple of the prior size."
-    d = pdf.n_rep/10
+    d = 5
     p = pdf.n_rep/d
     print "\n- Splitting system in", p, "systems of", d, "replicas."
 
@@ -75,22 +73,16 @@ def main(argv):
 
     # select a fraction of replicas of each subset
     print "\n- Building the final system."
-    if sqrtsize % p != 0:
-        print " [Warning] final partition size is not multiple of the subsystem."
-
-    cut = 30 #int(sqrtsize/p)
-    rep = numpy.zeros(shape=(cut*p), dtype=numpy.int64)
-    B = numpy.zeros(shape=(nf*nx, cut*p))
+    rep = numpy.zeros(shape=p, dtype=numpy.int64)
+    B = numpy.zeros(shape=(nf*nx, p))
     for t in range(p):
-        s = numpy.sort(resA[t])
-        v = numpy.where(resA[t] > s[len(s)-1-cut])[0]
-        for l in range(cut):
-            rep[l+t*cut] = v[l]+1+t*d
-            B[:, l+t*cut] = A[t, :, v[l]]
+        s = numpy.argmin(resA[t])
+        rep[t] = s+1+t*d
+        B[:, t] = A[t, :, s]
 
     # build the final system and solve
-    res = numpy.zeros(p*cut)
-    for r in range(p*cut):
+    res = numpy.zeros(p)
+    for r in range(p):
         b = B[:, r]
         a = numpy.delete(B, r, axis=1)
         res[r] = numpy.linalg.lstsq(a, b)[1]
@@ -98,17 +90,15 @@ def main(argv):
 
     # print replicas
     sres = numpy.sort(res)
-
     for n in nrep:
         eps = sres[len(sres)-1-n]
         print "\n- Selecting", n, ", cutoff for residuals:", eps
         print "- Printing final", len(numpy.where(res > eps)[0]), "replicas"
 
         r = numpy.where(res > eps)[0]
-
         f = open(pdf_name + "_hessian_" + str(n) + ".dat", 'wb')
         for i in range(len(r)):
-            f.write(str(int(rep[r[i]])) + "\n")
+            f.write(str(rep[r[i]]) + "\n")
         f.close()
 
     print " [Done]\n\n Now run the mc2hessian script with the custom basis.\n"
