@@ -93,10 +93,11 @@ def main(argv):
     for n in nrep:
         eps = sres[len(sres)-1-n]
         print "\n- Selecting", n, ", cutoff for residuals:", eps
-        print "- Printing final", len(numpy.where(res > eps)[0]), "replicas"
 
+        filename = pdf_name + "_hessian_" + str(n) + ".dat"
+        print "- Printing final", filename, "replicas"
         r = numpy.where(res > eps)[0]
-        f = open(pdf_name + "_hessian_" + str(n) + ".dat", 'wb')
+        f = open(filename, 'wb')
         for i in range(len(r)):
             f.write(str(rep[r[i]]) + "\n")
         f.close()
