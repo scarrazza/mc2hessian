@@ -71,7 +71,6 @@ def main(argv):
             b = A[t, :, r]
             a = numpy.delete(A[t], r, axis=1)
             resA[t, r] = numpy.linalg.lstsq(a,b)[1]
-        print t, numpy.sort(resA[t])
     print " [Done] "
 
     # select a fraction of replicas of each subset
@@ -96,7 +95,6 @@ def main(argv):
         a = numpy.delete(B, r, axis=1)
         res[r] = numpy.linalg.lstsq(a, b)[1]
     print " [Done] "
-    print res
 
     # print replicas
     sres = numpy.sort(res)
