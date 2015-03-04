@@ -45,7 +45,7 @@ def main(argv):
     print " [Done] "
 
     # Step 2: determine the best an for each replica
-    d = 6
+    d = 5
     p = pdf.n_rep/d
     print "\n- Splitting system in", p, "systems of", d, "replicas."
 

@@ -23,14 +23,15 @@ class LocalPDF:
         self.n_rep = len(self.pdf)-1
         self.fl = fl
         self.xgrid = xgrid
+        self.Q = Q
         self.xfxQ = numpy.zeros(shape=(self.n_rep, fl.n, xgrid.n))
-        self.base = numpy.zeros(shape=self.n_rep, dtype=numpy.int32)
+        self.base = numpy.zeros(shape=self.n_rep, dtype=numpy.int64)
+        self.fin = numpy.zeros(shape=self.n, dtype=numpy.int64)
 
         if rep_base != "":
             print "- Using custom basis"
             f = open(rep_base, 'rb')
-
-            fin = numpy.zeros(shape=nrep, dtype=numpy.int32)
+            fin = numpy.zeros(shape=nrep, dtype=numpy.int64)
             ind = 0
             for l in f.readlines():
                 if ind >= nrep:
@@ -44,7 +45,7 @@ class LocalPDF:
             print fin
 
             ind = 0
-            negative = numpy.zeros(shape=(self.n_rep-nrep+1), dtype=numpy.int64)
+            negative = numpy.zeros(shape=(self.n_rep-nrep), dtype=numpy.int64)
             for i in range(self.n_rep):
 
                 it = False
@@ -54,11 +55,11 @@ class LocalPDF:
                 if it == False:
                     negative[ind] = i+1
                     ind+=1
-
+            self.fin = fin
             self.base = numpy.append(fin, negative)
-
         else:
             for i in range(self.n_rep): self.base[i] = i+1
+            for i in range(self.n): self.fin[i] = i+1
 
         # precomputing values
         for r in range(self.n_rep):
@@ -91,6 +92,27 @@ class LocalPDF:
         cov = self.fill_cov(self.fl.n, self.xgrid.n, self.xfxQ, self.f0)
         return cov
 
+    @jit
+    def rebase(self, basis):
+        fin = numpy.sort(basis)
+        ind = 0
+        negative = numpy.zeros(shape=(self.n_rep-self.n), dtype=numpy.int64)
+        for i in range(self.n_rep):
+            it = False
+            for j in fin:
+                if j == i+1: it = True
+            if it == False:
+                negative[ind] = i+1
+                ind+=1
+        self.fin = fin
+        self.base = numpy.append(fin, negative)
+
+        # precomputing values
+        for r in range(self.n_rep):
+            for f in range(self.fl.n):
+                for ix in range(self.xgrid.n):
+                    self.xfxQ[r, f, ix] = self.pdf[self.base[r]].xfxQ(self.fl.id[f], self.xgrid.x[ix], self.Q)
+
 class XGrid:
     """ The x grid points used by the test """
     def __init__(self, xminlog, xminlin, nplog, nplin):
@@ -103,6 +125,21 @@ class Flavors:
     def __init__(self, nf):
         self.id = numpy.arange(-nf,nf+1)
         self.n = len(self.id)
+
+def invcov_sqrtinvcov(cov):
+    val, vec = numpy.linalg.eigh(cov)
+    invval = numpy.zeros(shape=len(val))
+    sqrtval = numpy.zeros(shape=len(val))
+    for i in range(len(val)):
+        if val[i] > 1e-12:
+            invval[i] = 1.0/val[i]
+            sqrtval[i] = 1.0/val[i]**0.5
+        else:
+            print " [Warning] Removing eigenvalue", i, val[i]
+
+    invcov = numpy.dot(vec, numpy.diag(invval)).dot(vec.T)
+    sqrtinvcov = numpy.dot(vec, numpy.diag(sqrtval)).dot(vec.T)
+    return invcov, sqrtinvcov
 
 @jit
 def chi2(c, nf, nx, rnew, n, xfxQ, f0, invcov):
@@ -130,20 +167,14 @@ def chi2(c, nf, nx, rnew, n, xfxQ, f0, invcov):
                     res += a*b*invcov[i, j]
     return res
 
-def minintask(i, nf, nx, n, xfxQ, f0, invcov, sqrtinvcov):
+def minintask(i, A, nf, nx, n, xfxQ, f0, invcov, sqrtinvcov):
     """ The minimization routine """
     min = lambda a: chi2(a, nf, nx, i, n, xfxQ, f0, invcov)
-    A = numpy.zeros(shape=(nf*nx, n))
-    b = numpy.zeros(shape=(nf*nx))
 
+    b = numpy.zeros(shape=(nf*nx))
     for fi in range(nf):
         for ix in range(nx):
-            ii = nx*fi + ix
-            for r in range(n):
-                A[ii, r] = xfxQ[r, fi, ix]-f0[fi, ix]
-            b[ii] = xfxQ[i, fi, ix]-f0[fi, ix]
-
-    A = sqrtinvcov.dot(A)
+            b[nx*fi + ix] = xfxQ[i, fi, ix]-f0[fi, ix]
     b = sqrtinvcov.dot(b)
 
     res = numpy.linalg.lstsq(A,b)[0]
@@ -232,8 +263,6 @@ def parallelrep(i, nrep, pdf, pdf_name, file, path, xs0, qs0, fs0, vec, store_xf
 
     if xs != xs0 or qs != qs0 or fs != fs0:
         print " Different grids for PDF replica. Using replica 0 grid."
-        #store_xfxQ_local = []
-        #rep0_local = []
         xs = xs0
         qs = qs0
         fs = fs0
@@ -254,16 +283,6 @@ def parallelrep(i, nrep, pdf, pdf_name, file, path, xs0, qs0, fs0, vec, store_xf
         qval = [float(ii) for ii in qval]
         fval = [int(ii)   for ii in fval]
 
-        """
-        # precache PDF grids
-        if xs != xs0 or qs != qs0 or fs != fs0:
-            res = numpy.zeros(shape=(nrep, len(fval), len(xval), len(qval)))
-            for r in range(nrep):
-                res[r] = precachepdf(pdf.pdf[pdf.base[r]].xfxQ, fval, xval, qval)
-            store_xfxQ.append(res)
-            rep0.append(precachepdf(pdf.pdf[0].xfxQ, fval, xval, qval))
-        """
-
         F = numpy.zeros(shape=(len(fval), len(xval), len(qval)))
         dumptofile(F, xval, qval, fval, vec[i-1], store_xfxQ[sub], rep0[sub])
 
@@ -275,6 +294,19 @@ def parallelrep(i, nrep, pdf, pdf_name, file, path, xs0, qs0, fs0, vec, store_xf
         out.write("---\n")
     out.close()
 
+@jit
+def comp_hess(nrep, vec, xfxQ, f, x, cv):
+
+    F = numpy.zeros(shape=nrep)
+    for i in range(nrep):
+        for j in range(nrep):
+            F[i] += vec[i][j]*(xfxQ[j, f, x] - cv)
+        F[i] += cv
+
+    err = 0
+    for i in range(nrep): err += (F[i]-cv)**2
+
+    return err**0.5
 
 def main(argv):
     # Get input set name
@@ -302,25 +334,24 @@ def main(argv):
     # Step 1: create pdf covmat
     print "\n- Building PDF covariance matrix:"
     cov = pdf.pdfcovmat()
-
-    val, vec = numpy.linalg.eigh(cov)
-    invval = numpy.zeros(shape=len(val))
-    sqrtval = numpy.zeros(shape=len(val))
-    for i in range(len(val)):
-        if val[i] > 1e-12:
-            invval[i] = 1.0/val[i]
-            sqrtval[i] = 1.0/val[i]**0.5
-        else: print " [Warning] Removing eigenvalue", i, val[i]
-
-    invcov = numpy.dot(vec, numpy.diag(invval)).dot(vec.T)
-    sqrtinvcov = numpy.dot(vec, numpy.diag(sqrtval)).dot(vec.T)
+    invcov, sqrtinvcov = invcov_sqrtinvcov(cov)
     print " [Done] "
 
     # Step 2: determine the best an for each replica
     an = numpy.zeros(shape=(pdf.n_rep, nrep))
     num_cores = multiprocessing.cpu_count()
+
+    # create matrix to be solved
+    A = numpy.zeros(shape=(nf*nx, nrep))
+    for fi in range(nf):
+        for ix in range(nx):
+            ii = nx*fi + ix
+            for r in range(nrep):
+                A[ii, r] = pdf.xfxQ[r, fi, ix]-pdf.f0[fi, ix]
+    A = sqrtinvcov.dot(A)
+
     print "\n- Solving the linear system for", nrep*pdf.n_rep, "parameters using", num_cores, "cores:"
-    an = Parallel(n_jobs=num_cores)(delayed(minintask)(i,nf,nx,nrep,pdf.xfxQ,pdf.f0,invcov,sqrtinvcov) for i in range(pdf.n_rep))
+    an = Parallel(n_jobs=num_cores)(delayed(minintask)(i,A,nf,nx,nrep,pdf.xfxQ,pdf.f0,invcov,sqrtinvcov) for i in range(pdf.n_rep))
     print " [Done] "
 
     # Step 3: construct the covariance matrix
@@ -339,27 +370,17 @@ def main(argv):
 
     # Step 5: quick test
     print "\n- Quick test:"
+    prior_cv = pdf.f0
+    prior_std = numpy.std(pdf.xfxQ, axis=0, ddof=1)
     est = 0
-    for f in fl.id:
-        for x in xgrid.x:
-            sum = 0
-            sq_sum = 0
-            for r in range(pdf.n_rep):
-                sum += pdf.pdf[r+1].xfxQ(f, x, Q)
-                sq_sum += pdf.pdf[r+1].xfxQ(f, x, Q)**2
-            cv = sum/pdf.n_rep
-            t0 = (sq_sum / (pdf.n_rep-1.0) - pdf.n_rep/(pdf.n_rep-1.0) * sum/pdf.n_rep* sum/pdf.n_rep)**0.5
+    for f in range(fl.n):
+        for x in range(xgrid.n):
+            cv = prior_cv[f,x]
+            t0 = prior_std[f,x]
+            t1 = comp_hess(nrep, vec, pdf.xfxQ, f, x, cv)
 
-            F = numpy.zeros(shape=nrep)
-            for i in range(nrep):
-                for j in range(nrep):
-                    F[i] += vec[i][j]*(pdf.pdf[pdf.base[j]].xfxQ(f,x,Q) - cv)
-                F[i] += cv
-            err = 0
-            for i in range(nrep): err += (F[i]-cv)**2
-            t1 = err**0.5
-            print "1-sigma MonteCarlo:",f, x, t0
-            print "1-sigma Hessian   :", f, x,  t1
+            print "1-sigma MonteCarlo (fl,x,sigma):", fl.id[f], xgrid.x[x], t0
+            print "1-sigma Hessian    (fl,x,sigma):", fl.id[f], xgrid.x[x], t1
             print "Ratio:", t1/t0
 
             if t0 != 0: est += abs((t1-t0)/t0)
