@@ -75,7 +75,10 @@ def main(argv):
             elif (g > 0.3 and g <= 0.6): nmut = 2
             elif (g > 0.6 and g <= 0.7): nmut = 3
             for t in range(nmut):
-                val = numpy.random.randint(1, pdf.n_rep+1)
+                done = False
+                while done == False:
+                    val = numpy.random.randint(1, pdf.n_rep+1)
+                    if val not in indextmp: done = True
                 pos = numpy.random.randint(0, nrep)
                 indextmp[pos] = val
             pdf.rebase(indextmp)
