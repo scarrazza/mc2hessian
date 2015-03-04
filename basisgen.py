@@ -36,19 +36,16 @@ def main(argv):
     cov = pdf.pdfcovmat()
 
     val, vec = numpy.linalg.eigh(cov)
-    sqrtsize = len(val)
     sqrtval = numpy.zeros(shape=len(val))
     for i in range(len(val)):
         if val[i] > 1e-12:
             sqrtval[i] = 1.0/val[i]**0.5
-        else:
-            print " [Warning] Removing eigenvalue", i, val[i]
-            sqrtsize -= 1
+        else: print " [Warning] Removing eigenvalue", i, val[i]
     sqrtinvcov = numpy.dot(vec, numpy.diag(sqrtval)).dot(vec.T)
     print " [Done] "
 
     # Step 2: determine the best an for each replica
-    d = 5
+    d = 6
     p = pdf.n_rep/d
     print "\n- Splitting system in", p, "systems of", d, "replicas."
 
