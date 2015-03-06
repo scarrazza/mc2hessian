@@ -337,6 +337,16 @@ def main(argv):
     invcov, sqrtinvcov = invcov_sqrtinvcov(cov)
     print " [Done] "
 
+    """
+    import seaborn as sns
+    import matplotlib.pyplot as plt
+    sns.set(context="paper", font="monospace")
+    f, ax = plt.subplots(figsize=(12, 9))
+    sns.heatmap(cov, vmin=-1e-5, vmax=1e-5, linewidths=0, square=True)
+    f.tight_layout()
+    plt.show()
+    """
+
     # Step 2: determine the best an for each replica
     an = numpy.zeros(shape=(pdf.n_rep, nrep))
     num_cores = multiprocessing.cpu_count()
