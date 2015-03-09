@@ -17,7 +17,7 @@ from joblib import Parallel, delayed
 
 class LocalPDF:
     """ A simple class for PDF manipulation """
-    def __init__(self, pdf_name, nrep, xgrid, fl, Q, rep_base):
+    def __init__(self, pdf_name, nrep, xgrid, fl, Q):
         self.pdf = lhapdf.mkPDFs(pdf_name)
         self.n = nrep
         self.n_rep = len(self.pdf)-1
@@ -28,38 +28,8 @@ class LocalPDF:
         self.base = numpy.zeros(shape=self.n_rep, dtype=numpy.int64)
         self.fin = numpy.zeros(shape=self.n, dtype=numpy.int64)
 
-        if rep_base != "":
-            print "- Using custom basis"
-            f = open(rep_base, 'rb')
-            fin = numpy.zeros(shape=nrep, dtype=numpy.int64)
-            ind = 0
-            for l in f.readlines():
-                if ind >= nrep:
-                    print " [Warning] Basis file contains more replicas than expected", nrep
-                    break
-                fin[ind] = int(l)
-                ind+=1
-            fin = numpy.sort(fin)
-            f.close()
-
-            print fin
-
-            ind = 0
-            negative = numpy.zeros(shape=(self.n_rep-nrep), dtype=numpy.int64)
-            for i in range(self.n_rep):
-
-                it = False
-                for j in fin:
-                    if j == i+1: it = True
-
-                if it == False:
-                    negative[ind] = i+1
-                    ind+=1
-            self.fin = fin
-            self.base = numpy.append(fin, negative)
-        else:
-            for i in range(self.n_rep): self.base[i] = i+1
-            for i in range(self.n): self.fin[i] = i+1
+        for i in range(self.n_rep): self.base[i] = i+1
+        for i in range(self.n): self.fin[i] = i+1
 
         # precomputing values
         for r in range(self.n_rep):
@@ -327,7 +297,7 @@ def main(argv):
     # Loading basic elements
     fl = Flavors(3)
     xgrid = XGrid(1e-5, 1e-1, 25, 25)
-    pdf = LocalPDF(pdf_name, nrep, xgrid, fl, Q, rep_base)
+    pdf = LocalPDF(pdf_name, nrep, xgrid, fl, Q)
     nx = xgrid.n
     nf = fl.n
 
@@ -336,6 +306,16 @@ def main(argv):
     cov = pdf.pdfcovmat()
     invcov, sqrtinvcov = invcov_sqrtinvcov(cov)
     print " [Done] "
+
+    # rebase pdfs
+    if rep_base != "":
+        print "\n- Using custom basis"
+        with  open(rep_base, 'r') as f:
+            nindex = numpy.array([ int(el) for el in f.readlines()])
+        if len(nindex) > nrep:
+            print " [Warning] large custom basis from file"
+        print nindex[0:nrep]
+        pdf.rebase(nindex[0:nrep])
 
     """
     import seaborn as sns
@@ -409,6 +389,7 @@ def main(argv):
     for l in inn.readlines():
         if l.find("SetDesc:") >= 0: out.write("SetDesc: \"Hessian " + pdf_name + "_hessian\"\n")
         elif l.find("NumMembers:") >= 0: out.write("NumMembers: " + str(nrep+1) + "\n")
+        elif l.find("ErrorType: replicas") >= 0: out.write("ErrorType: symmhessian\n")
         else: out.write(l)
     inn.close()
     out.close()

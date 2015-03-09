@@ -37,7 +37,7 @@ def main(argv):
     # Loading basic elements
     fl = Flavors(3)
     xgrid = XGrid(1e-5, 1e-1, 25, 25)
-    pdf = LocalPDF(pdf_name, nrep, xgrid, fl, Q, "")
+    pdf = LocalPDF(pdf_name, nrep, xgrid, fl, Q)
     index = pdf.fin
     indextmp = numpy.copy(index)
     nx = xgrid.n
