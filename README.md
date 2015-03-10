@@ -28,6 +28,16 @@ $ ./mc2hessian.py --help
 
 The output of this script is a hessian set of PDF in the LHAPDF6 format.
 
+### Basis selection
+We provide 2 extra scripts for the determination of the best basis of replicas for the conversion: basisgen and basisga. We recommend basisga which uses a genetic algorithm to determine the best set of replica, the full computation takes several hours:
+
+```Shell
+$ ./basisga.py --help
+   usage: ./basisga [PDF LHAPDF set] [Number of replicas] [Input energy]
+```
+
+This program outputs log files with the std.dev. estimator value and the corresponding replicas.
+
 ## Contact Information
 
 Maintainer: Stefano Carrazza (stefano.carrazza@mi.infn.it)
