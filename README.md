@@ -41,5 +41,3 @@ This program outputs log files with the std.dev. estimator value and the corresp
 ## Contact Information
 
 Maintainer: Stefano Carrazza (stefano.carrazza@mi.infn.it)
-
-Homepage:
