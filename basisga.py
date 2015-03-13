@@ -35,8 +35,8 @@ def main(argv):
     print "- GA Basis selector for Monte Carlo 2 Hessian conversion at", Q, "GeV"
 
     # Loading basic elements
-    fl = Flavors(3)
-    xgrid = XGrid(1e-5, 1e-1, 25, 25)
+    fl = Flavors()
+    xgrid = XGrid()
     pdf = LocalPDF(pdf_name, nrep, xgrid, fl, Q)
     index = pdf.fin
     indextmp = numpy.copy(index)
@@ -55,7 +55,7 @@ def main(argv):
     numpy.random.seed(0)
 
     prior_cv = pdf.f0
-    prior_std = numpy.std(pdf.xfxQ, axis=0, ddof=1)
+    prior_std = pdf.std
 
     file = pdf_name + "_hessian_" + str(nrep) + ".log"
     print "\n- Fitting, output redirected to log file", file

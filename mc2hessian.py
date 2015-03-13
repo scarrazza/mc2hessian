@@ -43,23 +43,38 @@ class LocalPDF:
             for ix in range(xgrid.n):
                 self.f0[f, ix] = self.pdf[0].xfxQ(fl.id[f], xgrid.x[ix], Q)
 
+        # compute std dev
+        self.std = numpy.std(self.xfxQ, axis=0, ddof=1)
+
+        # lower, upper 68cl
+        self.std68 = numpy.zeros(shape=(fl.n, xgrid.n))
+        for f in range(fl.n):
+            low, up = get_limits(self.xfxQ[:,f,:], self.f0[f,:])
+            self.std68[f] = (up-low)/2.0
+
+        # maximum difference between std vs 68cl. -> create pandas array
+        eps = 0.25
+        self.mask = numpy.array([ abs(1 - self.std[f,:]/self.std68[f,:]) <= eps for f in range(fl.n)])
+        print " [Info] Keeping ", numpy.count_nonzero(self.mask), "nf*nx using (1-std/68cl) <= eps =", eps
+
     @jit
-    def fill_cov(self, nf, nx, xfxQ, f0):
+    def fill_cov(self, nf, nx, xfxQ, f0, mask):
         n = len(xfxQ)
         cov = numpy.zeros(shape=(nf*nx,nf*nx))
         for fi in range(nf):
             for fj in range(nf):
                 for ix in range(nx):
                     for jx in range(nx):
-                        i = nx*fi+ix
-                        j = nx*fj+jx
-                        for r in range(n):
-                            cov[i, j] += (xfxQ[r, fi, ix] - f0[fi,ix])*(xfxQ[r, fj, jx] - f0[fj,jx])
+                        if mask[fi, ix] and mask[fj, jx]:
+                            i = nx*fi+ix
+                            j = nx*fj+jx
+                            for r in range(n):
+                                cov[i, j] += (xfxQ[r, fi, ix] - f0[fi,ix])*(xfxQ[r, fj, jx] - f0[fj,jx])
         return cov/(n-1.0)
 
     def pdfcovmat(self):
         """ Build PDF covariance matrices """
-        cov = self.fill_cov(self.fl.n, self.xgrid.n, self.xfxQ, self.f0)
+        cov = self.fill_cov(self.fl.n, self.xgrid.n, self.xfxQ, self.f0, self.mask)
         return cov
 
     @jit
@@ -83,16 +98,26 @@ class LocalPDF:
                 for ix in range(self.xgrid.n):
                     self.xfxQ[r, f, ix] = self.pdf[self.base[r]].xfxQ(self.fl.id[f], self.xgrid.x[ix], self.Q)
 
+def get_limits(xfxQ, f0):
+    reps,l = xfxQ.shape
+    d = numpy.abs(xfxQ - f0)
+    ind = numpy.argsort(d, axis=0)
+    ind68 = 68*reps//100
+    sr = xfxQ[ind,numpy.arange(0,l)][:ind68,:]
+    up1s = numpy.max(sr,axis=0)
+    low1s = numpy.min(sr,axis=0)
+    return low1s, up1s
+
 class XGrid:
     """ The x grid points used by the test """
-    def __init__(self, xminlog, xminlin, nplog, nplin):
+    def __init__(self, xminlog=1e-5, xminlin=1e-1, nplog=25, nplin=25):
         self.x = numpy.append(numpy.logspace(numpy.log10(xminlog), numpy.log10(xminlin), num=nplog, endpoint=False),
                               numpy.linspace(xminlin, 0.9, num=nplin, endpoint=False))
         self.n = len(self.x)
 
 class Flavors:
     """ The flavor container """
-    def __init__(self, nf):
+    def __init__(self, nf=3):
         self.id = numpy.arange(-nf,nf+1)
         self.n = len(self.id)
 
@@ -295,8 +320,8 @@ def main(argv):
     print "- Monte Carlo 2 Hessian conversion at", Q, "GeV"
 
     # Loading basic elements
-    fl = Flavors(3)
-    xgrid = XGrid(1e-5, 1e-1, 25, 25)
+    fl = Flavors()
+    xgrid = XGrid()
     pdf = LocalPDF(pdf_name, nrep, xgrid, fl, Q)
     nx = xgrid.n
     nf = fl.n
@@ -361,7 +386,7 @@ def main(argv):
     # Step 5: quick test
     print "\n- Quick test:"
     prior_cv = pdf.f0
-    prior_std = numpy.std(pdf.xfxQ, axis=0, ddof=1)
+    prior_std = pdf.std
     est = 0
     for f in range(fl.n):
         for x in range(xgrid.n):
