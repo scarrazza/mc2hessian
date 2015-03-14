@@ -112,10 +112,11 @@ def main(argv):
         est = 0
         for f in range(fl.n):
             for x in range(xgrid.n):
-                cv = prior_cv[f,x]
-                t0 = prior_std[f,x]
-                t1 = comp_hess(nrep, vec, pdf.xfxQ, f, x, cv)
-                if t0 != 0: est += abs((t1-t0)/t0)
+                if pdf.mask[f, x]:
+                    cv = prior_cv[f,x]
+                    t0 = prior_std[f,x]
+                    t1 = comp_hess(nrep, vec, pdf.xfxQ, f, x, cv)
+                    if t0 != 0: est += abs((t1-t0)/t0)
 
         if est < berf:
             berf = est

@@ -390,15 +390,16 @@ def main(argv):
     est = 0
     for f in range(fl.n):
         for x in range(xgrid.n):
-            cv = prior_cv[f,x]
-            t0 = prior_std[f,x]
-            t1 = comp_hess(nrep, vec, pdf.xfxQ, f, x, cv)
+            if pdf.mask[f, x]:
+                cv = prior_cv[f,x]
+                t0 = prior_std[f,x]
+                t1 = comp_hess(nrep, vec, pdf.xfxQ, f, x, cv)
 
-            print "1-sigma MonteCarlo (fl,x,sigma):", fl.id[f], xgrid.x[x], t0
-            print "1-sigma Hessian    (fl,x,sigma):", fl.id[f], xgrid.x[x], t1
-            print "Ratio:", t1/t0
+                print "1-sigma MonteCarlo (fl,x,sigma):", fl.id[f], xgrid.x[x], t0
+                print "1-sigma Hessian    (fl,x,sigma):", fl.id[f], xgrid.x[x], t1
+                print "Ratio:", t1/t0
 
-            if t0 != 0: est += abs((t1-t0)/t0)
+                if t0 != 0: est += abs((t1-t0)/t0)
     print "Estimator:", est
 
     # Step 6: exporting to LHAPDF
