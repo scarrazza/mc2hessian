@@ -53,6 +53,7 @@ def main(argv):
     nitemax = 2000
     berf = 1e8
     numpy.random.seed(0)
+    rW = 0
 
     prior_cv = pdf.f0
     prior_std = pdf.std
@@ -101,7 +102,11 @@ def main(argv):
         ainvcov = numpy.linalg.inv(acov)
 
         if not numpy.allclose(numpy.dot(acov, ainvcov), numpy.eye(len(acov))):
-            print " [Error] Too redundant basis, try to reduce the size of the basis."
+            print " [Warning] Too redundant basis, try to reduce the size of the basis."
+            rW += 1
+            if rW > 5: 
+                print " [Error] Too many redundant basis, stopping."
+                exit(-1)
             continue
 
         # Step 4: solve the system
