@@ -11,7 +11,6 @@ import sys
 import numpy
 import lhapdf
 import multiprocessing
-import scipy.linalg
 from numba import jit
 from joblib import Parallel, delayed
 
@@ -53,7 +52,7 @@ class LocalPDF:
             self.std68[f] = (up-low)/2.0
 
         # maximum difference between std vs 68cl. -> create pandas array
-        eps = 0.25
+        eps = 100
         self.mask = numpy.array([ abs(1 - self.std[f,:]/self.std68[f,:]) <= eps for f in range(fl.n)])
         print " [Info] Keeping ", numpy.count_nonzero(self.mask), "nf*nx using (1-std/68cl) <= eps =", eps
 
