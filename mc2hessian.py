@@ -308,8 +308,71 @@ def comp_hess(nrep, vec, xfxQ, f, x, cv):
 
     return err**0.5
 
+def make_grid(pdf, pdf_name, nrep, vec):
+    num_cores = multiprocessing.cpu_count()
+    path = lhapdf.paths()[0] + "/" + pdf_name
+    file = pdf_name + "_hessian_" + str(nrep)
+    print "\n- Exporting new grid:", file
+    if not os.path.exists(file): os.makedirs(file)
 
-def main(pdf_name, nrep, Q, epsilon=DEFAULT_EPSILON, basis=None):
+    # print info file
+    inn = open(path + "/" + pdf_name + ".info", 'rb')
+    out = open(file + "/" + pdf_name + "_hessian_" + str(nrep) + ".info", 'wb')
+
+    for l in inn.readlines():
+        if l.find("SetDesc:") >= 0: out.write("SetDesc: \"Hessian " + pdf_name + "_hessian\"\n")
+        elif l.find("NumMembers:") >= 0: out.write("NumMembers: " + str(nrep+1) + "\n")
+        elif l.find("ErrorType: replicas") >= 0: out.write("ErrorType: symmhessian\n")
+        else: out.write(l)
+    inn.close()
+    out.close()
+
+    # print replica 0
+    print " -> Writing replica 0"
+    header, xs0, qs0, fs0 = load_replica(0, path + "/" + pdf_name)
+
+    out = open(file + "/" + pdf_name + "_hessian_" + str(nrep) + "_0000.dat", 'wb')
+    out.write(header)
+
+    store_xfxQ = []
+    rep0 = []
+    for sub in range(len(xs0)):
+        out.write(xs0[sub])
+        out.write(qs0[sub])
+        out.write(fs0[sub])
+
+        xval = xs0[sub].split()
+        qval = qs0[sub].split()
+        fval = fs0[sub].split()
+        xval = [float(i) for i in xval]
+        qval = [float(i) for i in qval]
+        fval = [int(i)   for i in fval]
+
+        # precache PDF grids
+        res = numpy.zeros(shape=(nrep, len(fval), len(xval), len(qval)))
+        for r in range(nrep):
+            res[r] = precachepdf(pdf.pdf[pdf.base[r]].xfxQ, fval, xval, qval)
+        store_xfxQ.append(res)
+
+        # compute replica 0
+        rep0.append(precachepdf(pdf.pdf[0].xfxQ, fval, xval, qval))
+
+        for ix in range(len(xval)):
+            for iq in range(len(qval)):
+                for fi in range(len(fval)):
+                    print >> out, "%14.7E" % rep0[sub][fi, ix, iq],
+                out.write("\n")
+        out.write("---\n")
+    out.close()
+    # printing eigenstates
+    Parallel(n_jobs=num_cores)(delayed(parallelrep)(i, nrep, pdf, pdf_name,
+             file, path, xs0, qs0, fs0, vec, store_xfxQ, rep0)
+             for i in range(1, nrep+1))
+    print " [Done]"
+
+
+def main(pdf_name, nrep, Q, epsilon=DEFAULT_EPSILON, basis=None,
+         no_grid=False):
     # Get input set name
 
     print "- Monte Carlo 2 Hessian conversion at", Q, "GeV"
@@ -396,66 +459,11 @@ def main(pdf_name, nrep, Q, epsilon=DEFAULT_EPSILON, basis=None):
     print "Estimator:", est
 
     # Step 6: exporting to LHAPDF
-    path = lhapdf.paths()[0] + "/" + pdf_name
-    file = pdf_name + "_hessian_" + str(nrep)
-    print "\n- Exporting new grid:", file
-    if not os.path.exists(file): os.makedirs(file)
+    if not no_grid:
+        make_grid(pdf, pdf_name, nrep, vec)
 
-    # print info file
-    inn = open(path + "/" + pdf_name + ".info", 'rb')
-    out = open(file + "/" + pdf_name + "_hessian_" + str(nrep) + ".info", 'wb')
-
-    for l in inn.readlines():
-        if l.find("SetDesc:") >= 0: out.write("SetDesc: \"Hessian " + pdf_name + "_hessian\"\n")
-        elif l.find("NumMembers:") >= 0: out.write("NumMembers: " + str(nrep+1) + "\n")
-        elif l.find("ErrorType: replicas") >= 0: out.write("ErrorType: symmhessian\n")
-        else: out.write(l)
-    inn.close()
-    out.close()
-
-    # print replica 0
-    print " -> Writing replica 0"
-    header, xs0, qs0, fs0 = load_replica(0, path + "/" + pdf_name)
-
-    out = open(file + "/" + pdf_name + "_hessian_" + str(nrep) + "_0000.dat", 'wb')
-    out.write(header)
-
-    store_xfxQ = []
-    rep0 = []
-    for sub in range(len(xs0)):
-        out.write(xs0[sub])
-        out.write(qs0[sub])
-        out.write(fs0[sub])
-
-        xval = xs0[sub].split()
-        qval = qs0[sub].split()
-        fval = fs0[sub].split()
-        xval = [float(i) for i in xval]
-        qval = [float(i) for i in qval]
-        fval = [int(i)   for i in fval]
-
-        # precache PDF grids
-        res = numpy.zeros(shape=(nrep, len(fval), len(xval), len(qval)))
-        for r in range(nrep):
-            res[r] = precachepdf(pdf.pdf[pdf.base[r]].xfxQ, fval, xval, qval)
-        store_xfxQ.append(res)
-
-        # compute replica 0
-        rep0.append(precachepdf(pdf.pdf[0].xfxQ, fval, xval, qval))
-
-        for ix in range(len(xval)):
-            for iq in range(len(qval)):
-                for fi in range(len(fval)):
-                    print >> out, "%14.7E" % rep0[sub][fi, ix, iq],
-                out.write("\n")
-        out.write("---\n")
-    out.close()
-
-    # printing eigenstates
-    Parallel(n_jobs=num_cores)(delayed(parallelrep)(i, nrep, pdf, pdf_name, file, path, xs0, qs0, fs0, vec, store_xfxQ, rep0) for i in range(1, nrep+1))
-    print " [Done]"
-
-
+    #Return estimator for programmatic reading
+    return est
 
 
 def parse_basisfile(basisfile):
@@ -474,7 +482,7 @@ class ParseBasisAction(argparse.Action):
             setattr(namespace, self.dest, basis)
 
 
-argnames = {'pdf_name', 'nrep', 'Q', 'epsilon', 'basis'}
+argnames = {'pdf_name', 'nrep', 'Q', 'epsilon', 'basis', 'no_grid'}
 
 
 def parse_file(filename):
@@ -509,6 +517,10 @@ if __name__ == "__main__":
     parser.add_argument('--file', help = "YAML file in the format of "
                         "basisga.py")
 
+    parser.add_argument('--no-grid', action='store_true',
+                        help="Do NOT compute and save the LHAPDF grids. "
+                        "Output the error function only")
+
     args = parser.parse_args()
     if args.file:
         if len(sys.argv) > 3:
@@ -516,7 +528,7 @@ if __name__ == "__main__":
         mainargs = parse_file(args.file)
     else:
         if not all((args.pdf_name, args.nrep, args.Q)):
-            parser.error("Too few arguments: Either a file is required " 
+            parser.error("Too few arguments: Either a file is required "
                          "or pdf_name, nrep and Q.")
         mainargs = vars(args)
         mainargs.pop('file')
