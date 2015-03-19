@@ -506,7 +506,7 @@ if __name__ == "__main__":
     parser.add_argument('--basisfile', help="File that contains"
                        " the indexes of the basis, one for line.",
                        action=ParseBasisAction,)
-    parser.add_argument('--file', help = "JSON file in the format of "
+    parser.add_argument('--file', help = "YAML file in the format of "
                         "basisga.py")
 
     args = parser.parse_args()
