@@ -421,7 +421,7 @@ def main(pdf_name, nrep, Q, epsilon=DEFAULT_EPSILON, basis=None,
                 A[ii, r] = pdf.xfxQ[r, fi, ix]-pdf.f0[fi, ix]
     A = sqrtinvcov.dot(A)
 
-    print "\n- Solving the linear system for", nrep*pdf.n_rep, "parameters using", num_cores, "cores:"
+    print "\n- Solving the linear system for", nrep, "parameters using", num_cores, "cores:"
     an = Parallel(n_jobs=num_cores)(delayed(minintask)(i,A,nf,nx,nrep,pdf.xfxQ,pdf.f0,invcov,sqrtinvcov) for i in range(pdf.n_rep))
     print " [Done] "
 
