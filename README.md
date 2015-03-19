@@ -18,6 +18,7 @@ mc2hessian requires python2.7, numba, numpy, joblib, the simplest way to install
 $ conda create --name myenv --file requirements.txt
 $ source activate myenv
 ```
+[LHAPDF](https://lhapdf.hepforge.org/) needs to be installed and working correctly with the Python environment.
 
 ## Usage
 
