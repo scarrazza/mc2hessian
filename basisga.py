@@ -7,11 +7,19 @@ __version__ = '1.0.0'
 __email__ = 'stefano.carrazza@mi.infn.it'
 
 import sys
+import argparse
+
 import numpy
 import multiprocessing
 from numba import jit
 from joblib import Parallel, delayed
-from mc2hessian import LocalPDF, XGrid, Flavors, invcov_sqrtinvcov, comp_hess
+import yaml
+
+from mc2hessian import (LocalPDF, XGrid, Flavors, invcov_sqrtinvcov,
+                        comp_hess, DEFAULT_EPSILON)
+
+
+DEFAULT_MAXITER = 2000
 
 def minintask(i, A, nf, nx, n, xfxQ, f0, sqrtinvcov):
     b = numpy.zeros(shape=(nf*nx))
@@ -21,23 +29,15 @@ def minintask(i, A, nf, nx, n, xfxQ, f0, sqrtinvcov):
     b = sqrtinvcov.dot(b)
     return numpy.linalg.lstsq(A,b)[0]
 
-def main(argv):
+def main(pdf_name, nrep, Q, epsilon, max_iters=DEFAULT_MAXITER):
     # Get input set name
-    nrep = 100
-    pdf_name = ""
-    Q = 1.0
-    if len(argv) < 3: usage()
-    else:
-        pdf_name = argv[0]
-        nrep = int(argv[1])
-        Q = float(argv[2])
 
     print "- GA Basis selector for Monte Carlo 2 Hessian conversion at", Q, "GeV"
 
     # Loading basic elements
     fl = Flavors()
     xgrid = XGrid()
-    pdf = LocalPDF(pdf_name, nrep, xgrid, fl, Q)
+    pdf = LocalPDF(pdf_name, nrep, xgrid, fl, Q, eps=epsilon)
     index = pdf.fin
     indextmp = numpy.copy(index)
     nx = xgrid.n
@@ -50,7 +50,7 @@ def main(argv):
     # start ga
     num_cores = multiprocessing.cpu_count()
     nite = 0
-    nitemax = 2000
+    nitemax = max_iters
     berf = 1e8
     numpy.random.seed(0)
 
@@ -58,6 +58,7 @@ def main(argv):
     prior_std = pdf.std
 
     file = pdf_name + "_hessian_" + str(nrep) + ".log"
+    resultname =  pdf_name + "_hessian_" + str(nrep) + ".yaml"
     print "\n- Fitting, output redirected to log file", file
     log = open(file, "a")
     sys.stdout = log
@@ -126,6 +127,17 @@ def main(argv):
         print numpy.sort(index)
         nite += 1
 
+    result = {'Iterations': max_iters,
+              'Final ERF': float(berf),
+              'pdf_name':pdf_name,
+              'nrep':nrep,
+              'Q':Q ,
+              'epsilon':epsilon,
+              'basis': numpy.sort(index).tolist()}
+
+    print("Writing results file %s" % resultname)
+    with open(resultname, 'w') as f:
+        yaml.dump(result, f, default_flow_style=False)
     log.close()
 
 def usage():
@@ -143,5 +155,18 @@ def splash():
     print "\n  __v" + __version__ + "__ Author: Stefano Carrazza\n"
 
 if __name__ == "__main__":
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('pdf_name',
+                        help = "Name of LHAPDF set")
+    parser.add_argument('nrep',
+                        help="Number of basis vectors", type=int)
+    parser.add_argument('Q', type=float,
+                        help="Energy scale.")
+    parser.add_argument('--epsilon', type=float, default=DEFAULT_EPSILON,
+                        help="Minimum ratio between one sigma and "
+                        "68% intervals to select point.")
+    parser.add_argument('--max-iters', type=int, default=DEFAULT_MAXITER)
+    args = parser.parse_args()
     splash()
-    main(sys.argv[1:])
+    main(**vars(args))

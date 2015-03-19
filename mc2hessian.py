@@ -8,15 +8,22 @@ __email__ = 'stefano.carrazza@mi.infn.it'
 
 import os
 import sys
+import argparse
+import yaml
+
 import numpy
 import lhapdf
 import multiprocessing
 from numba import jit
 from joblib import Parallel, delayed
 
+DEFAULT_Q = 1.0
+DEFAULT_EPSILON = 100
+
+
 class LocalPDF:
     """ A simple class for PDF manipulation """
-    def __init__(self, pdf_name, nrep, xgrid, fl, Q):
+    def __init__(self, pdf_name, nrep, xgrid, fl, Q, eps=DEFAULT_EPSILON):
         self.pdf = lhapdf.mkPDFs(pdf_name)
         self.n = nrep
         self.n_rep = len(self.pdf)-1
@@ -52,7 +59,6 @@ class LocalPDF:
             self.std68[f] = (up-low)/2.0
 
         # maximum difference between std vs 68cl. -> create pandas array
-        eps = 100
         self.mask = numpy.array([ abs(1 - self.std[f,:]/self.std68[f,:]) <= eps for f in range(fl.n)])
         print " [Info] Keeping ", numpy.count_nonzero(self.mask), "nf*nx using (1-std/68cl) <= eps =", eps
 
@@ -302,26 +308,16 @@ def comp_hess(nrep, vec, xfxQ, f, x, cv):
 
     return err**0.5
 
-def main(argv):
+
+def main(pdf_name, nrep, Q, epsilon=DEFAULT_EPSILON, basis=None):
     # Get input set name
-    nrep = 100
-    pdf_name = ""
-    rep_base = ""
-    Q = 1.0
-    if len(argv) < 3: usage()
-    else:
-        pdf_name = argv[0]
-        nrep = int(argv[1])
-        Q = float(argv[2])
-    if len(argv) == 4:
-        rep_base = argv[3]
 
     print "- Monte Carlo 2 Hessian conversion at", Q, "GeV"
 
     # Loading basic elements
     fl = Flavors()
     xgrid = XGrid()
-    pdf = LocalPDF(pdf_name, nrep, xgrid, fl, Q)
+    pdf = LocalPDF(pdf_name, nrep, xgrid, fl, Q, eps=epsilon)
     nx = xgrid.n
     nf = fl.n
 
@@ -332,14 +328,12 @@ def main(argv):
     print " [Done] "
 
     # rebase pdfs
-    if rep_base != "":
+    if basis is not None:
         print "\n- Using custom basis"
-        with  open(rep_base, 'r') as f:
-            nindex = numpy.array([ int(el) for el in f.readlines()])
-        if len(nindex) > nrep:
+        if len(basis) > nrep:
             print " [Warning] large custom basis from file"
-        print nindex[0:nrep]
-        pdf.rebase(nindex[0:nrep])
+        print basis[0:nrep]
+        pdf.rebase(basis[0:nrep])
 
     """
     import seaborn as sns
@@ -461,9 +455,33 @@ def main(argv):
     Parallel(n_jobs=num_cores)(delayed(parallelrep)(i, nrep, pdf, pdf_name, file, path, xs0, qs0, fs0, vec, store_xfxQ, rep0) for i in range(1, nrep+1))
     print " [Done]"
 
-def usage():
-    print "usage: ./mc2hessian [PDF LHAPDF set] [Number of replicas] [Input energy] [OPTIONAL: replicas for base file]\n"
-    exit()
+
+
+
+def parse_basisfile(basisfile):
+    return numpy.loadtxt(basisfile, dtype=numpy.int)
+
+class ParseBasisAction(argparse.Action):
+    def __init__(self, option_strings, dest, nargs=None, **kwargs):
+        super(ParseBasisAction, self).__init__(option_strings, dest,
+              nargs=None, **kwargs)
+        self.dest = 'basis'
+    def __call__(self, parser, namespace, values, option_string=None):
+        if not values:
+            setattr(namespace, self.dest, None)
+        else:
+            basis = parse_basisfile(values)
+            setattr(namespace, self.dest, basis)
+
+
+argnames = {'pdf_name', 'nrep', 'Q', 'epsilon', 'basis'}
+
+
+def parse_file(filename):
+    with open(filename) as f:
+        d = yaml.load(f)
+    return {k:d[k] for k in d if k in argnames}
+
 
 def splash():
     print "                  ____  _                   _             "
@@ -473,6 +491,36 @@ def splash():
     print "  |_| |_| |_|\___|_____|_| |_|\___||___/___/_|\__,_|_| |_|"
     print "\n  __v" + __version__ + "__ Author: Stefano Carrazza\n"
 
+
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument('pdf_name', nargs='?',
+                        help = "Name of LHAPDF set")
+    parser.add_argument('nrep', nargs='?',
+                        help="Number of basis vectors", type=int)
+    parser.add_argument('Q', type=float,
+                        help="Energy scale.", nargs='?')
+    parser.add_argument('--epsilon', type=float, default=DEFAULT_EPSILON,
+                        help="Minimum ratio between one sigma and "
+                        "68% intervals to select point.")
+    parser.add_argument('--basisfile', help="File that contains"
+                       " the indexes of the basis, one for line.",
+                       action=ParseBasisAction,)
+    parser.add_argument('--file', help = "JSON file in the format of "
+                        "basisga.py")
+
+    args = parser.parse_args()
+    if args.file:
+        if len(sys.argv) > 3:
+            parser.error("Too many arguments with the --file option")
+        mainargs = parse_file(args.file)
+    else:
+        if not all((args.pdf_name, args.nrep, args.Q)):
+            parser.error()
+        mainargs = vars(args)
+        mainargs.pop('file')
+
+
+
     splash()
-    main(sys.argv[1:])
+    main(**mainargs)
