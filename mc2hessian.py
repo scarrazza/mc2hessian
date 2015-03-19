@@ -512,7 +512,7 @@ if __name__ == "__main__":
                         help="Minimum ratio between one sigma and "
                         "68%% intervals to select point.")
     parser.add_argument('--basisfile', help="File that contains"
-                       " the indexes of the basis, one for line.",
+                       " the indexes of the basis, one per line.",
                        action=ParseBasisAction,)
     parser.add_argument('--file', help = "YAML file in the format of "
                         "basisga.py")
