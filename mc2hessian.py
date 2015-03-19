@@ -516,7 +516,8 @@ if __name__ == "__main__":
         mainargs = parse_file(args.file)
     else:
         if not all((args.pdf_name, args.nrep, args.Q)):
-            parser.error("")
+            parser.error("Too few arguments: Either a file is required " 
+                         "or pdf_name, nrep and Q.")
         mainargs = vars(args)
         mainargs.pop('file')
 
