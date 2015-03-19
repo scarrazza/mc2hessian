@@ -516,7 +516,7 @@ if __name__ == "__main__":
         mainargs = parse_file(args.file)
     else:
         if not all((args.pdf_name, args.nrep, args.Q)):
-            parser.error()
+            parser.error("")
         mainargs = vars(args)
         mainargs.pop('file')
 
