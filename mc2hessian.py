@@ -502,7 +502,7 @@ if __name__ == "__main__":
                         help="Energy scale.", nargs='?')
     parser.add_argument('--epsilon', type=float, default=DEFAULT_EPSILON,
                         help="Minimum ratio between one sigma and "
-                        "68% intervals to select point.")
+                        "68%% intervals to select point.")
     parser.add_argument('--basisfile', help="File that contains"
                        " the indexes of the basis, one for line.",
                        action=ParseBasisAction,)
