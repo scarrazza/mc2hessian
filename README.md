@@ -25,7 +25,7 @@ $ source activate myenv
 ```Shell
 $./mc2hessian.py --help
 usage: mc2hessian.py [-h] [--epsilon EPSILON] [--basisfile BASIS]
-                     [--file FILE]
+                     [--file FILE] [--no-grid]
                      [pdf_name] [nrep] [Q]
 
 positional arguments:
@@ -37,9 +37,11 @@ optional arguments:
   -h, --help         show this help message and exit
   --epsilon EPSILON  Minimum ratio between one sigma and 68% intervals to
                      select point.
-  --basisfile BASIS  File that contains the indexes of the basis, one for
+  --basisfile BASIS  File that contains the indexes of the basis, one per
                      line.
   --file FILE        YAML file in the format of basisga.py
+  --no-grid          Do NOT compute and save the LHAPDF grids. Output the
+                     error function only
 ```
 
 The output of this script is a hessian set of PDF in the LHAPDF6 format.
