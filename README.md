@@ -22,8 +22,23 @@ $ source activate myenv
 ## Usage
 
 ```Shell
-$ ./mc2hessian.py --help
-   usage: ./mc2hessian [PDF LHAPDF set] [Number of replicas] [Input energy] [OPTIONAL: replicas for base file]
+$./mc2hessian.py --help
+usage: mc2hessian.py [-h] [--epsilon EPSILON] [--basisfile BASIS]
+                     [--file FILE]
+                     [pdf_name] [nrep] [Q]
+
+positional arguments:
+  pdf_name           Name of LHAPDF set
+  nrep               Number of basis vectors
+  Q                  Energy scale.
+
+optional arguments:
+  -h, --help         show this help message and exit
+  --epsilon EPSILON  Minimum ratio between one sigma and 68% intervals to
+                     select point.
+  --basisfile BASIS  File that contains the indexes of the basis, one for
+                     line.
+  --file FILE        YAML file in the format of basisga.py
 ```
 
 The output of this script is a hessian set of PDF in the LHAPDF6 format.
@@ -32,11 +47,25 @@ The output of this script is a hessian set of PDF in the LHAPDF6 format.
 We provide 2 extra scripts for the determination of the best basis of replicas for the conversion: basisgen and basisga. We recommend basisga which uses a genetic algorithm to determine the best set of replica, the full computation takes several hours:
 
 ```Shell
-$ ./basisga.py --help
-   usage: ./basisga [PDF LHAPDF set] [Number of replicas] [Input energy]
+$ python basisga.py --help
+usage: basisga.py [-h] [--epsilon EPSILON] [--max-iters MAX_ITERS]
+                  pdf_name nrep Q
+
+positional arguments:
+  pdf_name              Name of LHAPDF set
+  nrep                  Number of basis vectors
+  Q                     Energy scale.
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --epsilon EPSILON     Minimum ratio between one sigma and 68% intervals to
+                        select point.
+  --max-iters MAX_ITERS
 ```
 
 This program outputs log files with the std.dev. estimator value and the corresponding replicas.
+
+It also outputs a YAML file containing the final results. This can be passed to `mc2hessian.py`  using the `--file` option.
 
 ## Contact Information
 

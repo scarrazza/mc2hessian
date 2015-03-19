@@ -502,11 +502,11 @@ if __name__ == "__main__":
                         help="Energy scale.", nargs='?')
     parser.add_argument('--epsilon', type=float, default=DEFAULT_EPSILON,
                         help="Minimum ratio between one sigma and "
-                        "68% intervals to select point.")
+                        "68%% intervals to select point.")
     parser.add_argument('--basisfile', help="File that contains"
                        " the indexes of the basis, one for line.",
                        action=ParseBasisAction,)
-    parser.add_argument('--file', help = "JSON file in the format of "
+    parser.add_argument('--file', help = "YAML file in the format of "
                         "basisga.py")
 
     args = parser.parse_args()
@@ -516,7 +516,8 @@ if __name__ == "__main__":
         mainargs = parse_file(args.file)
     else:
         if not all((args.pdf_name, args.nrep, args.Q)):
-            parser.error()
+            parser.error("Too few arguments: Either a file is required " 
+                         "or pdf_name, nrep and Q.")
         mainargs = vars(args)
         mainargs.pop('file')
 

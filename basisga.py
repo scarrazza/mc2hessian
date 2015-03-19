@@ -170,7 +170,7 @@ if __name__ == "__main__":
                         help="Energy scale.")
     parser.add_argument('--epsilon', type=float, default=DEFAULT_EPSILON,
                         help="Minimum ratio between one sigma and "
-                        "68% intervals to select point.")
+                        "68%% intervals to select point.")
     parser.add_argument('--max-iters', type=int, default=DEFAULT_MAXITER)
     args = parser.parse_args()
     splash()
