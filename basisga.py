@@ -109,6 +109,7 @@ def main(pdf_name, nrep, Q, epsilon, max_iters=DEFAULT_MAXITER):
                 print " [Error] Too many redundant basis, stopping."
                 exit(-1)
             continue
+        else: rW = 0
 
         # Step 4: solve the system
         eigenvalues, vec = numpy.linalg.eigh(ainvcov)
