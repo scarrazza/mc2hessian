@@ -182,13 +182,13 @@ def minintask(i, A, nf, nx, n, xfxQ, f0, invcov, sqrtinvcov):
     return res
 
 @jit
-def dumptofile(F, xval, qval, fval, vec, store_xfxQ, rep0):
+def dumptofile(F, xval, qval, fval, i, vec, store_xfxQ, rep0):
     """ Compute eigenvector direction """
     for ix in range(len(xval)):
         for iq in range(len(qval)):
             for fi in range(len(fval)):
-                for j in range(len(vec)):
-                    F[fi, ix, iq] += vec[j]*(store_xfxQ[j, fi, ix, iq] - rep0[fi, ix, iq])
+                for j in range(store_xfxQ.shape[0]):
+                    F[fi, ix, iq] += vec[j][i]*(store_xfxQ[j, fi, ix, iq] - rep0[fi, ix, iq])
                 F[fi, ix, iq] += rep0[fi, ix, iq]
 
 def load_replica(rep, pdf_name):
@@ -284,7 +284,7 @@ def parallelrep(i, nrep, pdf, pdf_name, file, path, xs0, qs0, fs0, vec, store_xf
         fval = [int(ii)   for ii in fval]
 
         F = numpy.zeros(shape=(len(fval), len(xval), len(qval)))
-        dumptofile(F, xval, qval, fval, vec[i-1], store_xfxQ[sub], rep0[sub])
+        dumptofile(F, xval, qval, fval, i-1, vec, store_xfxQ[sub], rep0[sub])
 
         for ix in range(len(xval)):
             for iq in range(len(qval)):
@@ -299,8 +299,8 @@ def comp_hess(nrep, vec, xfxQ, f, x, cv):
 
     F = numpy.zeros(shape=nrep)
     for i in range(nrep):
-        for j in range(nrep):
-            F[i] += vec[i][j]*(xfxQ[j, f, x] - cv)
+        for j in range(xfxQ.shape[0]):
+            F[i] += vec[j][i]*(xfxQ[j, f, x] - cv)
         F[i] += cv
 
     err = 0
@@ -349,9 +349,9 @@ def make_grid(pdf, pdf_name, nrep, vec):
         fval = [int(i)   for i in fval]
 
         # precache PDF grids
-        res = numpy.zeros(shape=(nrep, len(fval), len(xval), len(qval)))
-        for r in range(nrep):
-            res[r] = precachepdf(pdf.pdf[pdf.base[r]].xfxQ, fval, xval, qval)
+        res = numpy.zeros(shape=(pdf.n_rep, len(fval), len(xval), len(qval)))
+        for r in range(pdf.n_rep):
+            res[r] = precachepdf(pdf.pdf[r+1].xfxQ, fval, xval, qval)
         store_xfxQ.append(res)
 
         # compute replica 0
@@ -386,8 +386,7 @@ def main(pdf_name, nrep, Q, epsilon=DEFAULT_EPSILON, basis=None,
 
     # Step 1: create pdf covmat
     print "\n- Building PDF covariance matrix:"
-    cov = pdf.pdfcovmat()
-    invcov, sqrtinvcov = invcov_sqrtinvcov(cov)
+    X = (pdf.xfxQ.reshape(pdf.n_rep, nx*nf) - pdf.f0.reshape(nx*nf)).T
     print " [Done] "
 
     # rebase pdfs
@@ -403,11 +402,11 @@ def main(pdf_name, nrep, Q, epsilon=DEFAULT_EPSILON, basis=None,
     import matplotlib.pyplot as plt
     sns.set(context="paper", font="monospace")
     f, ax = plt.subplots(figsize=(12, 9))
-    sns.heatmap(cov, vmin=-1e-5, vmax=1e-5, linewidths=0, square=True)
+    sns.heatmap(numpy.cov(X), vmin=-1e-5, vmax=1e-5, linewidths=0, square=True)
     f.tight_layout()
     plt.show()
     """
-
+    """
     # Step 2: determine the best an for each replica
     an = numpy.zeros(shape=(pdf.n_rep, nrep))
     num_cores = multiprocessing.cpu_count()
@@ -435,10 +434,14 @@ def main(pdf_name, nrep, Q, epsilon=DEFAULT_EPSILON, basis=None,
         print " [Error] Too redundant basis, try to reduce the size of the basis."
         exit()
     print " [Done] "
+    """
 
     # Step 4: solve the system
-    eigenvalues, vec = numpy.linalg.eigh(ainvcov)
-    for i in range(len(vec)): vec[i] /= eigenvalues[i]**0.5
+    U, s, V = numpy.linalg.svd(X, full_matrices=False)
+    vec = V[:nrep,:].T/(pdf.n_rep-1)**0.5
+
+    #eigenvalues, vec = numpy.linalg.eigh(ainvcov)
+    #for i in range(len(vec)): vec[i] /= eigenvalues[i]**0.5
 
     # Step 5: quick test
     print "\n- Quick test:"
@@ -458,14 +461,13 @@ def main(pdf_name, nrep, Q, epsilon=DEFAULT_EPSILON, basis=None,
 
                 if t0 != 0: est += abs((t1-t0)/t0)
     print "Estimator:", est
-
+    
     # Step 6: exporting to LHAPDF
     if not no_grid:
         make_grid(pdf, pdf_name, nrep, vec)
-
-    #Return estimator for programmatic reading
+    
+    # Return estimator for programmatic reading
     return est
-
 
 def parse_basisfile(basisfile):
     return numpy.loadtxt(basisfile, dtype=numpy.int)
