@@ -5,8 +5,10 @@ Created on Tue Apr 21 22:00:01 2015
 @author: zah
 """
 
-import numpy
+import shutil
 import pandas as pd
+from common import *
+
 def split_sep(f):
     for line in f:
         if line.startswith(b'---'):
@@ -64,16 +66,14 @@ def _rep_to_buffer(out, header, subgrids):
         numpy.savetxt(out, reshaped, delimiter=" ", newline="\n ", fmt='%14.7E')
         out.write(sep)
 
-
-
 def write_replica(rep, pdf_name, header, subgrids):
     suffix = str(rep).zfill(4)
     with open(pdf_name + "_" + suffix + ".dat", 'wb') as out:
         _rep_to_buffer(out, header, subgrids)
 
 #TODO: Deduce nrep
-def load_all_replicas(pdf_name, nrep=1000):
-    headers, grids = zip(*[load_replica_2(rep, pdf_name) for rep in range(0,nrep+1)])
+def load_all_replicas(pdf):
+    headers, grids = zip(*[load_replica_2(rep, pdf) for rep in range(0,pdf.n_rep+1)])
     return headers, grids
 
 def big_matrix(gridlist):
@@ -85,19 +85,35 @@ def big_matrix(gridlist):
         raise ValueError("Incompatible grid specifications")
     return X
 
-def hessian_from_lincomb(pdf_name, V):
-    #TODO: Handle the case where grids are non-identical
+def hessian_from_lincomb(pdf, pdf_name, V):
+
+    # preparing output folder
+    nrep = V.shape[1]
+
+    base = lhapdf.paths()[0] + "/" + pdf_name + "/" + pdf_name
+    file = pdf_name + "_hessian_" + str(nrep)
+    if not os.path.exists(file): os.makedirs(file)
+
+    # copy replica 0
+    shutil.copy(base + "_0000.dat", file + "/" + file + "_0000.dat")
+    # copy info
+    shutil.copy(base + ".info", file + "/" + file + ".info")
+
+    inn = open(base + ".info", 'rb')
+    out = open(file + "/" + file + ".info", 'wb')
+    for l in inn.readlines():
+        if l.find("SetDesc:") >= 0: out.write("SetDesc: \"Hessian " + pdf_name + "_hessian\"\n")
+        elif l.find("NumMembers:") >= 0: out.write("NumMembers: " + str(nrep+1) + "\n")
+        elif l.find("ErrorType: replicas") >= 0: out.write("ErrorType: symmhessian\n")
+        else: out.write(l)
+    inn.close()
+    out.close()
+
+    """
     headers, grids = load_all_replicas(pdf_name)
-    #TODO: Write in  proper folder
-    hess_name = '1000rep_h/' + '_hessian_%d' % V.shape[1]
-    write_replica(0, hess_name, headers[0], grids[0])
+    hess_name = file + '/' + file + '_%d' % V.shape[1]
     result  = (big_matrix(grids).dot(V)).add(grids[0], axis=0, )
     hess_header = b"PdfType: error\nFormat: lhagrid1\n"
     for column in result.columns:
-        #TODO: Write infos.
         write_replica(column + 1, hess_name, hess_header, result[column])
-        
-if __name__ == '__main__':
-    V = numpy.random.rand(1000,100)
-    pdf_name = "/usr/local/share/LHAPDF/1000rep/1000rep"
-    hessian_from_lincomb(pdf_name, V)
+    """
