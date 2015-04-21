@@ -91,7 +91,7 @@ def hessian_from_lincomb(pdf_name, V):
     #TODO: Write in  proper folder
     hess_name = '1000rep_h/' + '_hessian_%d' % V.shape[1]
     write_replica(0, hess_name, headers[0], grids[0])
-    result  = big_matrix(grids).dot(V)
+    result  = (big_matrix(grids).dot(V)).add(grids[0], axis=0, )
     hess_header = b"PdfType: error\nFormat: lhagrid1\n"
     for column in result.columns:
         #TODO: Write infos.
