@@ -48,7 +48,7 @@ def main(pdf_name, neig, Q, epsilon=DEFAULT_EPSILON, no_grid=False):
     # Step 3: quick test
     print "\n- Quick test:"
     rmask = mask.reshape(fl.n, xgrid.n)
-    est = 0
+    est = Norm = 0
     for f in range(fl.n):
         for x in range(xgrid.n):
             if rmask[f,x]:
@@ -59,9 +59,10 @@ def main(pdf_name, neig, Q, epsilon=DEFAULT_EPSILON, no_grid=False):
                 print "1-sigma Hessian    (fl,x,sigma):", fl.id[f], xgrid.x[x], t1
                 print "Ratio:", t1/t0
 
-                est += pdf.f0[f,x] * (1-t1/t0)
+                est += abs(pdf.f0[f,x] * (1-t1/t0))
+                Norm += abs(pdf.f0[f,x])
 
-    print "Estimator:", est/rmask.sum()
+    print "Estimator:", est/Norm
 
     # Step 4: exporting to LHAPDF
     if not no_grid:
