@@ -67,11 +67,15 @@ def _rep_to_buffer(out, header, subgrids):
     out.write(sep)
     for _,g in subgrids.groupby(level=0):
         out.write(b'\n')
-        for ind in g.index.levels[1:3]:
-            numpy.savetxt(out, ind, fmt='%.7E',delimiter=' ', newline=' ')
-            out.write(b'\n')
+        ind = g.index.get_level_values(1)
+        numpy.savetxt(out, ind, fmt='%.7E',delimiter=' ', newline=' ')
+        out.write(b'\n')
+        ind = g.index.get_level_values(2)
+        numpy.savetxt(out, ind, fmt='%.7E',delimiter=' ', newline=' ')
+        out.write(b'\n')
         #Integer format
-        numpy.savetxt(out, g.index.levels[3], delimiter=' ', fmt="%d", 
+        ind = g.index.get_level_values(3)
+        numpy.savetxt(out, ind, delimiter=' ', fmt="%d", 
                       newline=' ')
         out.write(b'\n ')
         #Reshape so printing is easy
