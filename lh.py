@@ -5,8 +5,11 @@ Created on Tue Apr 21 22:00:01 2015
 @author: zah
 """
 
+import sys
 import shutil
+
 import pandas as pd
+
 from common import *
 
 def split_sep(f):
