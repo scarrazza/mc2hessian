@@ -9,29 +9,14 @@ __email__ = 'stefano.carrazza@mi.infn.it'
 
 from lh import *
 
-@jit
-def comp_hess(nrep, vec, xfxQ, f, x, cv):
-
-    F = numpy.zeros(shape=nrep)
-    for i in range(nrep):
-        for j in range(xfxQ.shape[0]):
-            F[i] += vec[j][i]*(xfxQ[j, f, x] - cv)
-        F[i] += cv
-
-    err = 0
-    for i in range(nrep): err += (F[i]-cv)**2
-
-    return err**0.5
-
-def main(pdf_name, nrep, Q, epsilon=DEFAULT_EPSILON, no_grid=False):
-    # Get input set name
+def main(pdf_name, neig, Q, epsilon=DEFAULT_EPSILON, no_grid=False):
 
     print "- Monte Carlo 2 Hessian conversion at", Q, "GeV"
 
     # Loading basic elements
     fl = Flavors()
     xgrid = XGrid()
-    pdf = LocalPDF(pdf_name, nrep, xgrid, fl, Q, eps=epsilon)
+    pdf = LocalPDF(pdf_name, neig, xgrid, fl, Q, eps=epsilon)
     nx = xgrid.n
     nf = fl.n
 
@@ -42,19 +27,20 @@ def main(pdf_name, nrep, Q, epsilon=DEFAULT_EPSILON, no_grid=False):
 
     # Step 2: solve the system
     U, s, V = numpy.linalg.svd(X, full_matrices=False)
-    vec = V[:nrep,:].T/(pdf.n_rep-1)**0.5
+    vec = V[:neig,:].T/(pdf.n_rep-1)**0.5
+
+    u = U[:,:neig]
+    cov = numpy.dot(u, numpy.dot(numpy.diag(s[:neig]**2/(pdf.n_rep-1)), u.T))
+    stdh = numpy.sqrt(numpy.diag(cov)).reshape((fl.n, xgrid.n))
 
     # Step 3: quick test
     print "\n- Quick test:"
-    prior_cv = pdf.f0
-    prior_std = pdf.std
     est = 0
     for f in range(fl.n):
         for x in range(xgrid.n):
-            if pdf.mask[f, x]:
-                cv = prior_cv[f,x]
-                t0 = prior_std[f,x]
-                t1 = comp_hess(nrep, vec, pdf.xfxQ, f, x, cv)
+            if pdf.mask[f,x]:
+                t0 = pdf.std[f,x]
+                t1 = stdh[f,x]
 
                 print "1-sigma MonteCarlo (fl,x,sigma):", fl.id[f], xgrid.x[x], t0
                 print "1-sigma Hessian    (fl,x,sigma):", fl.id[f], xgrid.x[x], t1
@@ -65,12 +51,12 @@ def main(pdf_name, nrep, Q, epsilon=DEFAULT_EPSILON, no_grid=False):
 
     # Step 4: exporting to LHAPDF
     print "\n- Exporting new grid..."
-    hessian_from_lincomb(pdf, pdf_name, vec)
+    hessian_from_lincomb(pdf, vec)
 
     # Return estimator for programmatic reading
     return est
 
-argnames = {'pdf_name', 'nrep', 'Q', 'epsilon', 'no_grid'}
+argnames = {'pdf_name', 'neig', 'Q', 'epsilon', 'no_grid'}
 
 def splash():
     print "                  ____  _                   _             "
@@ -85,8 +71,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('pdf_name', nargs='?',
                         help = "Name of LHAPDF set")
-    parser.add_argument('nrep', nargs='?',
-                        help="Number of basis vectors", type=int)
+    parser.add_argument('neig', nargs='?',
+                        help="Number of desired eigenvectors", type=int)
     parser.add_argument('Q', type=float,
                         help="Energy scale.", nargs='?')
     parser.add_argument('--epsilon', type=float, default=DEFAULT_EPSILON,
@@ -97,8 +83,8 @@ if __name__ == "__main__":
                         "Output the error function only")
 
     args = parser.parse_args()
-    if not all((args.pdf_name, args.nrep, args.Q)):
-        parser.error("Too few arguments: pdf_name, nrep and Q.")
+    if not all((args.pdf_name, args.neig, args.Q)):
+        parser.error("Too few arguments: pdf_name, neig and Q.")
     mainargs = vars(args)
 
     splash()

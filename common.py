@@ -24,6 +24,7 @@ DEFAULT_EPSILON = 100
 class LocalPDF:
     """ A simple class for PDF manipulation """
     def __init__(self, pdf_name, nrep, xgrid, fl, Q, eps=DEFAULT_EPSILON):
+        self.pdf_name = pdf_name
         self.pdf = lhapdf.mkPDFs(pdf_name)
         self.n = nrep
         self.n_rep = len(self.pdf)-1

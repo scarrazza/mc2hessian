@@ -14,8 +14,9 @@ def split_sep(f):
         if line.startswith(b'---'):
             break
         yield line
-    
-def read_xqf(f):
+
+def read_xqf_from_file(f):
+
     lines = split_sep(f)
     try:
         (xtext, qtext, ftext) = [next(lines) for _ in range(3)]
@@ -25,25 +26,38 @@ def read_xqf(f):
     qvals = numpy.fromstring(qtext, sep = " ")
     fvals = numpy.fromstring(ftext, sep = " ", dtype=numpy.int)
     vals = numpy.fromstring(b''.join(lines), sep= " ")
-    #vals = vals.reshape((len(xvals), len(qvals), len(fvals)))
     return pd.Series(vals, index = pd.MultiIndex.from_product((xvals, qvals, fvals)))
+
+
+def read_xqf_from_lhapdf(pdf, rep0grids):
+    indexes = tuple(rep0grids.index)
+    vals = []
+    for x in indexes:
+        vals += [pdf.xfxQ(x[3],x[1],x[2])]
+    return pd.Series(vals, index = rep0grids.index)
 
 def read_all_xqf(f):
     while True:
-        result = read_xqf(f)
+        result = read_xqf_from_file(f)
         if result is None:
             return
         yield result
 
 #TODO: Make pdf_name the pdf_name instead of path
-def load_replica_2(rep, pdf_name):
+def load_replica_2(rep, pdf_name, pdf=None, rep0grids=None):
+
+    sys.stdout.write("-> Reading replica from LHAPDF %d \r" % rep)
+    sys.stdout.flush()
+
     suffix = str(rep).zfill(4)
     with open(pdf_name + "_" + suffix + ".dat", 'rb') as inn:
         header = b"".join(split_sep(inn))
-        xfqs = list(read_all_xqf(inn))
-        #MultiIndex groupby doesn't give the correct length.
-        #Do this only when needed.
-        xfqs = pd.concat(xfqs, keys=range(len(xfqs)))
+
+        if rep0grids is not None:
+            xfqs = read_xqf_from_lhapdf(pdf, rep0grids)
+        else:
+            xfqs = list(read_all_xqf(inn))
+            xfqs = pd.concat(xfqs, keys=range(len(xfqs)))
     return header, xfqs
 
 #Split this to debug easily
@@ -71,10 +85,10 @@ def write_replica(rep, pdf_name, header, subgrids):
     with open(pdf_name + "_" + suffix + ".dat", 'wb') as out:
         _rep_to_buffer(out, header, subgrids)
 
-#TODO: Deduce nrep
-def load_all_replicas(pdf):
-    headers, grids = zip(*[load_replica_2(rep, pdf) for rep in range(0,pdf.n_rep+1)])
-    return headers, grids
+def load_all_replicas(pdf, pdf_name):
+    rep0headers, rep0grids = load_replica_2(0,pdf_name)
+    headers, grids = zip(*[load_replica_2(rep, pdf_name, pdf.pdf[rep], rep0grids) for rep in range(1,pdf.n_rep+1)])
+    return [rep0headers] + list(headers), [rep0grids] + list(grids)
 
 def big_matrix(gridlist):
     central_value = gridlist[0]
@@ -85,35 +99,31 @@ def big_matrix(gridlist):
         raise ValueError("Incompatible grid specifications")
     return X
 
-def hessian_from_lincomb(pdf, pdf_name, V):
+def hessian_from_lincomb(pdf, V):
 
     # preparing output folder
-    nrep = V.shape[1]
+    neig = V.shape[1]
 
-    base = lhapdf.paths()[0] + "/" + pdf_name + "/" + pdf_name
-    file = pdf_name + "_hessian_" + str(nrep)
+    base = lhapdf.paths()[0] + "/" + pdf.pdf_name + "/" + pdf.pdf_name
+    file = pdf.pdf_name + "_hessian_" + str(neig)
     if not os.path.exists(file): os.makedirs(file)
 
     # copy replica 0
     shutil.copy(base + "_0000.dat", file + "/" + file + "_0000.dat")
-    # copy info
-    shutil.copy(base + ".info", file + "/" + file + ".info")
 
     inn = open(base + ".info", 'rb')
     out = open(file + "/" + file + ".info", 'wb')
     for l in inn.readlines():
-        if l.find("SetDesc:") >= 0: out.write("SetDesc: \"Hessian " + pdf_name + "_hessian\"\n")
-        elif l.find("NumMembers:") >= 0: out.write("NumMembers: " + str(nrep+1) + "\n")
+        if l.find("SetDesc:") >= 0: out.write("SetDesc: \"Hessian " + pdf.pdf_name + "_hessian\"\n")
+        elif l.find("NumMembers:") >= 0: out.write("NumMembers: " + str(neig+1) + "\n")
         elif l.find("ErrorType: replicas") >= 0: out.write("ErrorType: symmhessian\n")
         else: out.write(l)
     inn.close()
     out.close()
 
-    """
-    headers, grids = load_all_replicas(pdf_name)
-    hess_name = file + '/' + file + '_%d' % V.shape[1]
+    headers, grids = load_all_replicas(pdf, base)
+    hess_name = file + '/' + file
     result  = (big_matrix(grids).dot(V)).add(grids[0], axis=0, )
     hess_header = b"PdfType: error\nFormat: lhagrid1\n"
     for column in result.columns:
         write_replica(column + 1, hess_name, hess_header, result[column])
-    """
