@@ -7,7 +7,13 @@ __license__ = 'GPL'
 __version__ = '1.0.0'
 __email__ = 'stefano.carrazza@mi.infn.it'
 
+
+import argparse
+
+import numpy as np
+
 from lh import *
+
 
 def main(pdf_name, neig, Q, epsilon=DEFAULT_EPSILON, no_grid=False):
 
@@ -25,22 +31,29 @@ def main(pdf_name, neig, Q, epsilon=DEFAULT_EPSILON, no_grid=False):
     X = (pdf.xfxQ.reshape(pdf.n_rep, nx*nf) - pdf.f0.reshape(nx*nf)).T
     print " [Done] "
 
+    #Epsilon
+    l = get_limits(X.T)
+    diff = (l.up1s - l.low1s)/2
+    std = np.std(X,axis=1)
+    mask = (np.abs((diff-std)/diff) < epsilon)
+    X = X[mask,:]
     # Step 2: solve the system
-    U, s, V = numpy.linalg.svd(X, full_matrices=False)
+    U, s, V = np.linalg.svd(X, full_matrices=False)
     vec = V[:neig,:].T/(pdf.n_rep-1)**0.5
 
     u = U[:,:neig]
-    cov = numpy.dot(u, numpy.dot(numpy.diag(s[:neig]**2/(pdf.n_rep-1)), u.T))
-    stdh = numpy.sqrt(numpy.diag(cov)).reshape((fl.n, xgrid.n))
+    cov = np.dot(u, np.dot(np.diag(s[:neig]**2/(pdf.n_rep-1)), u.T))
+    stdh = iter(np.sqrt(np.diag(cov)))
 
     # Step 3: quick test
     print "\n- Quick test:"
+    rmask = mask.reshape(fl.n, xgrid.n)
     est = 0
     for f in range(fl.n):
         for x in range(xgrid.n):
-            if pdf.mask[f,x]:
+            if rmask[f,x]:
                 t0 = pdf.std[f,x]
-                t1 = stdh[f,x]
+                t1 = next(stdh)
 
                 print "1-sigma MonteCarlo (fl,x,sigma):", fl.id[f], xgrid.x[x], t0
                 print "1-sigma Hessian    (fl,x,sigma):", fl.id[f], xgrid.x[x], t1
@@ -50,8 +63,9 @@ def main(pdf_name, neig, Q, epsilon=DEFAULT_EPSILON, no_grid=False):
     print "Estimator:", est
 
     # Step 4: exporting to LHAPDF
-    print "\n- Exporting new grid..."
-    hessian_from_lincomb(pdf, vec)
+    if not no_grid:
+        print "\n- Exporting new grid..."
+        hessian_from_lincomb(pdf, vec)
 
     # Return estimator for programmatic reading
     return est
