@@ -59,8 +59,9 @@ def main(pdf_name, neig, Q, epsilon=DEFAULT_EPSILON, no_grid=False):
                 print "1-sigma Hessian    (fl,x,sigma):", fl.id[f], xgrid.x[x], t1
                 print "Ratio:", t1/t0
 
-                if t0 != 0: est += abs((t1-t0)/t0)
-    print "Estimator:", est
+                est += pdf.f0[f,x] * (1-t1/t0)
+
+    print "Estimator:", est/rmask.sum()
 
     # Step 4: exporting to LHAPDF
     if not no_grid:
