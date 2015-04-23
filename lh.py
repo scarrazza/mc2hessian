@@ -5,12 +5,13 @@ Created on Tue Apr 21 22:00:01 2015
 @author: zah
 """
 
+import os
 import sys
 import shutil
+import lhapdf
+import numpy as np
 
 import pandas as pd
-
-from common import *
 
 def split_sep(f):
     for line in f:
@@ -25,10 +26,10 @@ def read_xqf_from_file(f):
         (xtext, qtext, ftext) = [next(lines) for _ in range(3)]
     except StopIteration:
         return None
-    xvals = numpy.fromstring(xtext, sep = " ")
-    qvals = numpy.fromstring(qtext, sep = " ")
-    fvals = numpy.fromstring(ftext, sep = " ", dtype=numpy.int)
-    vals = numpy.fromstring(b''.join(lines), sep= " ")
+    xvals = np.fromstring(xtext, sep = " ")
+    qvals = np.fromstring(qtext, sep = " ")
+    fvals = np.fromstring(ftext, sep = " ", dtype=np.int)
+    vals = np.fromstring(b''.join(lines), sep= " ")
     return pd.Series(vals, index = pd.MultiIndex.from_product((xvals, qvals, fvals)))
 
 
@@ -71,20 +72,20 @@ def _rep_to_buffer(out, header, subgrids):
     for _,g in subgrids.groupby(level=0):
         out.write(b'\n')
         ind = g.index.get_level_values(1).unique()
-        numpy.savetxt(out, ind, fmt='%.7E',delimiter=' ', newline=' ')
+        np.savetxt(out, ind, fmt='%.7E',delimiter=' ', newline=' ')
         out.write(b'\n')
         ind = g.index.get_level_values(2).unique()
-        numpy.savetxt(out, ind, fmt='%.7E',delimiter=' ', newline=' ')
+        np.savetxt(out, ind, fmt='%.7E',delimiter=' ', newline=' ')
         out.write(b'\n')
         #Integer format
         ind = g.index.get_level_values(3).unique()
-        numpy.savetxt(out, ind, delimiter=' ', fmt="%d", 
+        np.savetxt(out, ind, delimiter=' ', fmt="%d", 
                       newline=' ')
         out.write(b'\n ')
         #Reshape so printing is easy
         reshaped = g.reshape((len(g.groupby(level=1))*len(g.groupby(level=2)), 
                               len(g.groupby(level=3))))
-        numpy.savetxt(out, reshaped, delimiter=" ", newline="\n ", fmt='%14.7E')
+        np.savetxt(out, reshaped, delimiter=" ", newline="\n ", fmt='%14.7E')
         out.write(sep)
 
 def write_replica(rep, pdf_name, header, subgrids):
@@ -102,7 +103,7 @@ def big_matrix(gridlist):
     X = pd.concat(gridlist[1:], axis=1,
                  keys=range(1,len(gridlist)+1), #avoid confusion with rep0
                  ).subtract(central_value, axis=0)
-    if numpy.any(X.isnull()) or X.shape[0] != len(central_value):
+    if np.any(X.isnull()) or X.shape[0] != len(central_value):
         raise ValueError("Incompatible grid specifications")
     return X
 
