@@ -11,9 +11,10 @@ __email__ = 'stefano.carrazza@mi.infn.it'
 import argparse
 
 import numpy as np
+from common import LocalPDF, XGrid, Flavors, get_limits
+from lh import hessian_from_lincomb
 
-from lh import *
-
+DEFAULT_EPSILON = 1000
 
 def main(pdf_name, neig, Q, epsilon=DEFAULT_EPSILON, no_grid=False):
 
@@ -22,7 +23,7 @@ def main(pdf_name, neig, Q, epsilon=DEFAULT_EPSILON, no_grid=False):
     # Loading basic elements
     fl = Flavors()
     xgrid = XGrid()
-    pdf = LocalPDF(pdf_name, neig, xgrid, fl, Q, eps=epsilon)
+    pdf = LocalPDF(pdf_name, xgrid, fl, Q)
     nx = xgrid.n
     nf = fl.n
 
@@ -36,6 +37,10 @@ def main(pdf_name, neig, Q, epsilon=DEFAULT_EPSILON, no_grid=False):
     diff = (l.up1s - l.low1s)/2
     std = np.std(X,axis=1)
     mask = (np.abs((diff-std)/diff) < epsilon)
+    # maximum difference between std vs 68cl. -> create pandas array
+    print (" [Info] Keeping %d nf*nx using (1-std/68cl) <= eps =%.3f" % 
+           (np.count_nonzero(mask), epsilon))
+
     X = X[mask,:]
     # Step 2: solve the system
     U, s, V = np.linalg.svd(X, full_matrices=False)
