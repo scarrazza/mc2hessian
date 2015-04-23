@@ -66,8 +66,9 @@ def main(pdf_name, neig, Q, epsilon=DEFAULT_EPSILON, no_grid=False):
 
                 est += abs(pdf.f0[f,x] * (1-t1/t0))
                 Norm += abs(pdf.f0[f,x])
-
-    print "Estimator:", est/Norm
+                
+    est /= Norm
+    print "Estimator:", est
 
     # Step 4: exporting to LHAPDF
     if not no_grid:
