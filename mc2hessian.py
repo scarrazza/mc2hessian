@@ -12,134 +12,15 @@ import argparse
 import yaml
 
 import numpy
-import lhapdf
 import multiprocessing
 from numba import jit
 from joblib import Parallel, delayed
+from lh import hessian_from_lincomb
+
+from common import LocalPDF, XGrid, Flavors, invcov_sqrtinvcov
 
 DEFAULT_Q = 1.0
 DEFAULT_EPSILON = 100
-
-
-class LocalPDF:
-    """ A simple class for PDF manipulation """
-    def __init__(self, pdf_name, nrep, xgrid, fl, Q, eps=DEFAULT_EPSILON):
-        self.pdf = lhapdf.mkPDFs(pdf_name)
-        self.n = nrep
-        self.n_rep = len(self.pdf)-1
-        self.fl = fl
-        self.xgrid = xgrid
-        self.Q = Q
-        self.xfxQ = numpy.zeros(shape=(self.n_rep, fl.n, xgrid.n))
-        self.base = numpy.zeros(shape=self.n_rep, dtype=numpy.int64)
-        self.fin = numpy.zeros(shape=self.n, dtype=numpy.int64)
-
-        for i in range(self.n_rep): self.base[i] = i+1
-        for i in range(self.n): self.fin[i] = i+1
-
-        # precomputing values
-        for r in range(self.n_rep):
-            for f in range(fl.n):
-                for ix in range(xgrid.n):
-                    self.xfxQ[r, f, ix] = self.pdf[self.base[r]].xfxQ(fl.id[f], xgrid.x[ix], Q)
-
-        # precomputing averages
-        self.f0 = numpy.zeros(shape=(fl.n, xgrid.n))
-        for f in range(fl.n):
-            for ix in range(xgrid.n):
-                self.f0[f, ix] = self.pdf[0].xfxQ(fl.id[f], xgrid.x[ix], Q)
-
-        # compute std dev
-        self.std = numpy.std(self.xfxQ, axis=0, ddof=1)
-
-        # lower, upper 68cl
-        self.std68 = numpy.zeros(shape=(fl.n, xgrid.n))
-        for f in range(fl.n):
-            low, up = get_limits(self.xfxQ[:,f,:], self.f0[f,:])
-            self.std68[f] = (up-low)/2.0
-
-        # maximum difference between std vs 68cl. -> create pandas array
-        self.mask = numpy.array([ abs(1 - self.std[f,:]/self.std68[f,:]) <= eps for f in range(fl.n)])
-        print " [Info] Keeping ", numpy.count_nonzero(self.mask), "nf*nx using (1-std/68cl) <= eps =", eps
-
-    @jit
-    def fill_cov(self, nf, nx, xfxQ, f0, mask):
-        n = len(xfxQ)
-        cov = numpy.zeros(shape=(nf*nx,nf*nx))
-        for fi in range(nf):
-            for fj in range(nf):
-                for ix in range(nx):
-                    for jx in range(nx):
-                        if mask[fi, ix] and mask[fj, jx]:
-                            i = nx*fi+ix
-                            j = nx*fj+jx
-                            for r in range(n):
-                                cov[i, j] += (xfxQ[r, fi, ix] - f0[fi,ix])*(xfxQ[r, fj, jx] - f0[fj,jx])
-        return cov/(n-1.0)
-
-    def pdfcovmat(self):
-        """ Build PDF covariance matrices """
-        cov = self.fill_cov(self.fl.n, self.xgrid.n, self.xfxQ, self.f0, self.mask)
-        return cov
-
-    @jit
-    def rebase(self, basis):
-        fin = numpy.sort(basis)
-        ind = 0
-        negative = numpy.zeros(shape=(self.n_rep-self.n), dtype=numpy.int64)
-        for i in range(self.n_rep):
-            it = False
-            for j in fin:
-                if j == i+1: it = True
-            if it == False:
-                negative[ind] = i+1
-                ind+=1
-        self.fin = fin
-        self.base = numpy.append(fin, negative)
-
-        # precomputing values
-        for r in range(self.n_rep):
-            for f in range(self.fl.n):
-                for ix in range(self.xgrid.n):
-                    self.xfxQ[r, f, ix] = self.pdf[self.base[r]].xfxQ(self.fl.id[f], self.xgrid.x[ix], self.Q)
-
-def get_limits(xfxQ, f0):
-    reps,l = xfxQ.shape
-    d = numpy.abs(xfxQ - f0)
-    ind = numpy.argsort(d, axis=0)
-    ind68 = 68*reps//100
-    sr = xfxQ[ind,numpy.arange(0,l)][:ind68,:]
-    up1s = numpy.max(sr,axis=0)
-    low1s = numpy.min(sr,axis=0)
-    return low1s, up1s
-
-class XGrid:
-    """ The x grid points used by the test """
-    def __init__(self, xminlog=1e-5, xminlin=1e-1, nplog=25, nplin=25):
-        self.x = numpy.append(numpy.logspace(numpy.log10(xminlog), numpy.log10(xminlin), num=nplog, endpoint=False),
-                              numpy.linspace(xminlin, 0.9, num=nplin, endpoint=False))
-        self.n = len(self.x)
-
-class Flavors:
-    """ The flavor container """
-    def __init__(self, nf=3):
-        self.id = numpy.arange(-nf,nf+1)
-        self.n = len(self.id)
-
-def invcov_sqrtinvcov(cov):
-    val, vec = numpy.linalg.eigh(cov)
-    invval = numpy.zeros(shape=len(val))
-    sqrtval = numpy.zeros(shape=len(val))
-    for i in range(len(val)):
-        if val[i] > 1e-12:
-            invval[i] = 1.0/val[i]
-            sqrtval[i] = 1.0/val[i]**0.5
-        else:
-            print " [Warning] Removing eigenvalue", i, val[i]
-
-    invcov = numpy.dot(vec, numpy.diag(invval)).dot(vec.T)
-    sqrtinvcov = numpy.dot(vec, numpy.diag(sqrtval)).dot(vec.T)
-    return invcov, sqrtinvcov
 
 @jit
 def chi2(c, nf, nx, rnew, n, xfxQ, f0, invcov):
@@ -171,128 +52,15 @@ def minintask(i, A, nf, nx, n, xfxQ, f0, invcov, sqrtinvcov):
     """ The minimization routine """
     min = lambda a: chi2(a, nf, nx, i, n, xfxQ, f0, invcov)
 
-    b = numpy.zeros(shape=(nf*nx))
+    b = numpy.zeros(shape=(nf*nx))    
     for fi in range(nf):
         for ix in range(nx):
             b[nx*fi + ix] = xfxQ[i, fi, ix]-f0[fi, ix]
-    b = sqrtinvcov.dot(b)
+    b = sqrtinvcov.dot(b)    
 
     res = numpy.linalg.lstsq(A,b)[0]
     print " -> Replica", i+1, "ERF:", min(res)
     return res
-
-@jit
-def dumptofile(F, xval, qval, fval, vec, store_xfxQ, rep0):
-    """ Compute eigenvector direction """
-    for ix in range(len(xval)):
-        for iq in range(len(qval)):
-            for fi in range(len(fval)):
-                for j in range(len(vec)):
-                    F[fi, ix, iq] += vec[j]*(store_xfxQ[j, fi, ix, iq] - rep0[fi, ix, iq])
-                F[fi, ix, iq] += rep0[fi, ix, iq]
-
-def load_replica(rep, pdf_name):
-    """ Extract information from replica file """
-    suffix = ""
-    if rep < 10:
-        suffix = "000" + str(rep)
-    elif rep < 100:
-        suffix = "00" + str(rep)
-    elif rep < 1000:
-        suffix = "0" + str(rep)
-    else: suffix = str(rep)
-
-    inn = open(pdf_name + "_" + suffix + ".dat", 'rb')
-    # extract header
-    header = ""
-    done = False
-    while not done:
-        text = inn.readline()
-        header += text
-        if text.find("---") >= 0: done = True
-
-    if rep != 0:
-        header = header.replace('replica', 'error')
-
-    xtext = []
-    qtext = []
-    ftext = []
-    # load first subgrid
-    xtext.append(inn.readline())
-    qtext.append(inn.readline())
-    ftext.append(inn.readline())
-
-    done = False
-    while not done:
-        text = inn.readline()
-        if text.find("---") >=0:
-            text = inn.readline()
-            if text != "":
-                xtext.append(text)
-                qtext.append(inn.readline())
-                ftext.append(inn.readline())
-            else: done = True
-
-    inn.close()
-
-    return header, xtext, qtext, ftext
-
-@jit
-def precachepdf(xfxQ, fval, xval, qval):
-    """ load pdf values """
-    res = numpy.zeros(shape=(len(fval), len(xval), len(qval)))
-    for fi in range(len(fval)):
-        for xi in range(len(xval)):
-            for qi in range(len(qval)):
-                res[fi, xi, qi] = xfxQ(fval[fi], xval[xi], qval[qi])
-    return res
-
-def parallelrep(i, nrep, pdf, pdf_name, file, path, xs0, qs0, fs0, vec, store_xfxQ, rep0):
-    """ write to file using multiple processors """
-    suffix = ""
-    if i < 10:
-        suffix = "000" + str(i)
-    elif i < 100:
-        suffix = "00" + str(i)
-    elif i < 1000:
-        suffix = "0" + str(i)
-    else: suffix = str(i)
-
-    print " -> Writing replica", i
-    header, xs, qs, fs = load_replica(pdf.base[i-1], path + "/" + pdf_name)
-
-    if xs != xs0 or qs != qs0 or fs != fs0:
-        print " Different grids for PDF replica. Using replica 0 grid."
-        xs = xs0
-        qs = qs0
-        fs = fs0
-
-    out = open(file + "/" + pdf_name + "_hessian_" + str(nrep) + "_" + suffix + ".dat", 'wb')
-
-    out.write(header)
-
-    for sub in range(len(xs)):
-        out.write(xs[sub])
-        out.write(qs[sub])
-        out.write(fs[sub])
-
-        xval = xs[sub].split()
-        qval = qs[sub].split()
-        fval = fs[sub].split()
-        xval = [float(ii) for ii in xval]
-        qval = [float(ii) for ii in qval]
-        fval = [int(ii)   for ii in fval]
-
-        F = numpy.zeros(shape=(len(fval), len(xval), len(qval)))
-        dumptofile(F, xval, qval, fval, vec[i-1], store_xfxQ[sub], rep0[sub])
-
-        for ix in range(len(xval)):
-            for iq in range(len(qval)):
-                for fi in range(len(fval)):
-                    print >> out, "%14.7E" % F[fi, ix, iq],
-                out.write("\n")
-        out.write("---\n")
-    out.close()
 
 @jit
 def comp_hess(nrep, vec, xfxQ, f, x, cv):
@@ -307,69 +75,6 @@ def comp_hess(nrep, vec, xfxQ, f, x, cv):
     for i in range(nrep): err += (F[i]-cv)**2
 
     return err**0.5
-
-def make_grid(pdf, pdf_name, nrep, vec):
-    num_cores = multiprocessing.cpu_count()
-    path = lhapdf.paths()[0] + "/" + pdf_name
-    file = pdf_name + "_hessian_" + str(nrep)
-    print "\n- Exporting new grid:", file
-    if not os.path.exists(file): os.makedirs(file)
-
-    # print info file
-    inn = open(path + "/" + pdf_name + ".info", 'rb')
-    out = open(file + "/" + pdf_name + "_hessian_" + str(nrep) + ".info", 'wb')
-
-    for l in inn.readlines():
-        if l.find("SetDesc:") >= 0: out.write("SetDesc: \"Hessian " + pdf_name + "_hessian\"\n")
-        elif l.find("NumMembers:") >= 0: out.write("NumMembers: " + str(nrep+1) + "\n")
-        elif l.find("ErrorType: replicas") >= 0: out.write("ErrorType: symmhessian\n")
-        else: out.write(l)
-    inn.close()
-    out.close()
-
-    # print replica 0
-    print " -> Writing replica 0"
-    header, xs0, qs0, fs0 = load_replica(0, path + "/" + pdf_name)
-
-    out = open(file + "/" + pdf_name + "_hessian_" + str(nrep) + "_0000.dat", 'wb')
-    out.write(header)
-
-    store_xfxQ = []
-    rep0 = []
-    for sub in range(len(xs0)):
-        out.write(xs0[sub])
-        out.write(qs0[sub])
-        out.write(fs0[sub])
-
-        xval = xs0[sub].split()
-        qval = qs0[sub].split()
-        fval = fs0[sub].split()
-        xval = [float(i) for i in xval]
-        qval = [float(i) for i in qval]
-        fval = [int(i)   for i in fval]
-
-        # precache PDF grids
-        res = numpy.zeros(shape=(nrep, len(fval), len(xval), len(qval)))
-        for r in range(nrep):
-            res[r] = precachepdf(pdf.pdf[pdf.base[r]].xfxQ, fval, xval, qval)
-        store_xfxQ.append(res)
-
-        # compute replica 0
-        rep0.append(precachepdf(pdf.pdf[0].xfxQ, fval, xval, qval))
-
-        for ix in range(len(xval)):
-            for iq in range(len(qval)):
-                for fi in range(len(fval)):
-                    print >> out, "%14.7E" % rep0[sub][fi, ix, iq],
-                out.write("\n")
-        out.write("---\n")
-    out.close()
-    # printing eigenstates
-    Parallel(n_jobs=num_cores)(delayed(parallelrep)(i, nrep, pdf, pdf_name,
-             file, path, xs0, qs0, fs0, vec, store_xfxQ, rep0)
-             for i in range(1, nrep+1))
-    print " [Done]"
-
 
 def main(pdf_name, nrep, Q, epsilon=DEFAULT_EPSILON, basis=None,
          no_grid=False):
@@ -397,16 +102,6 @@ def main(pdf_name, nrep, Q, epsilon=DEFAULT_EPSILON, basis=None,
             print " [Warning] large custom basis from file"
         print basis[0:nrep]
         pdf.rebase(basis[0:nrep])
-
-    """
-    import seaborn as sns
-    import matplotlib.pyplot as plt
-    sns.set(context="paper", font="monospace")
-    f, ax = plt.subplots(figsize=(12, 9))
-    sns.heatmap(cov, vmin=-1e-5, vmax=1e-5, linewidths=0, square=True)
-    f.tight_layout()
-    plt.show()
-    """
 
     # Step 2: determine the best an for each replica
     an = numpy.zeros(shape=(pdf.n_rep, nrep))
@@ -461,7 +156,7 @@ def main(pdf_name, nrep, Q, epsilon=DEFAULT_EPSILON, basis=None,
 
     # Step 6: exporting to LHAPDF
     if not no_grid:
-        make_grid(pdf, pdf_name, nrep, vec)
+        hessian_from_lincomb(pdf, vec.T)
 
     #Return estimator for programmatic reading
     return est
