@@ -11,19 +11,77 @@ __email__ = 'stefano.carrazza@mi.infn.it'
 import argparse
 
 import numpy as np
+import fastcache
+
+
 from common import LocalPDF, XGrid, Flavors, get_limits
 from lh import hessian_from_lincomb
 
 DEFAULT_EPSILON = 1000
+
+@fastcache.lru_cache()
+def load_pdf(pdf_name, Q):
+    fl = Flavors()
+    xgrid = XGrid()
+    pdf = LocalPDF(pdf_name, xgrid, fl, Q)
+    return pdf, fl, xgrid
+
+def refine_relative(nnew, full_diag, part_diag, others):
+    mask = np.zeros(others.shape[1], dtype=bool)
+    #index = np.arange(others.shape[1])
+    for _ in range(nnew):
+        remaining = others[: , ~mask]
+        worst = np.argmin(part_diag/full_diag)
+        best_eig = np.argmax(remaining[worst,:])
+        ind = (np.where(~mask)[0])[best_eig]
+        
+        part_diag += remaining[:, best_eig]
+        mask[ind] = True
+    return mask
+    
+def get_diag(U,s):
+    Us = np.dot(U, np.diag(s))
+    return np.sum(Us**2, axis=1)
+    
+def compress_X_rel(X, neig):
+    U, s, V = np.linalg.svd(X, full_matrices=False)
+    norm = np.sqrt(X.shape[1] - 1)
+    sn = s/norm
+    full_diag = get_diag(U, sn)
+    nbig_vects =  neig // 2
+    part_diag = get_diag(U[:,:nbig_vects], sn[:nbig_vects])
+    
+    others = np.dot(U[:,nbig_vects:], np.diag(sn[nbig_vects:]))**2
+    nnew = neig - nbig_vects
+    mask = np.ones_like(sn, dtype=bool)
+    refmask = refine_relative(nnew, full_diag, part_diag, others)
+    mask[nbig_vects:] = refmask
+
+    u = U[:,mask]
+    vec = V[mask,:].T/norm
+    
+    cov = np.dot(u, np.dot(np.diag(sn[mask]**2), u.T))
+    return vec, cov
+
+def compress_X_abs(X, neig):
+    U, s, V = np.linalg.svd(X, full_matrices=False)
+    norm = np.sqrt(X.shape[1] - 1)
+    sn = s/norm
+    u = U[:,:neig]
+    vec = V[:neig,:].T/norm
+    cov = np.dot(u, np.dot(np.diag(sn[:neig]**2), u.T))
+    
+    return vec, cov
+
+compress_X = compress_X_rel
+    
 
 def main(pdf_name, neig, Q, epsilon=DEFAULT_EPSILON, no_grid=False):
 
     print "- Monte Carlo 2 Hessian conversion at", Q, "GeV"
 
     # Loading basic elements
-    fl = Flavors()
-    xgrid = XGrid()
-    pdf = LocalPDF(pdf_name, xgrid, fl, Q)
+    pdf, fl, xgrid = load_pdf(pdf_name, Q)
     nx = xgrid.n
     nf = fl.n
 
@@ -42,9 +100,8 @@ def main(pdf_name, neig, Q, epsilon=DEFAULT_EPSILON, no_grid=False):
            (np.count_nonzero(mask), epsilon))
 
     X = X[mask,:]
-    # Step 2: solve the system
-    U, s, V = np.linalg.svd(X, full_matrices=False)
-    vec = V[:neig,:].T/(pdf.n_rep-1)**0.5
+     # Step 2: solve the system
+    vec, cov = compress_X(X, neig)
 
     u = U[:,:neig]
     cov = np.dot(u, np.dot(np.diag(s[:neig]**2/(pdf.n_rep-1)), u.T))
