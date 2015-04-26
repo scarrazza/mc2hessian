@@ -40,7 +40,7 @@ class LocalPDF:
  
 class XGrid:
     """ The x grid points used by the test """
-    def __init__(self, xminlog=1e-5, xminlin=1e-1, xmax=1, nplog=25, nplin=25):
+    def __init__(self, xminlog=1e-5, xminlin=1e-1, xmax=1, nplog=50, nplin=50):
         self.x = np.append(np.logspace(np.log10(xminlog), np.log10(xminlin), 
                                        num=nplog, endpoint=False),
                            np.linspace(xminlin, xmax, num=nplin, endpoint=False)
