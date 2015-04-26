@@ -103,8 +103,6 @@ def main(pdf_name, neig, Q, epsilon=DEFAULT_EPSILON, no_grid=False):
      # Step 2: solve the system
     vec, cov = compress_X(X, neig)
 
-    u = U[:,:neig]
-    cov = np.dot(u, np.dot(np.diag(s[:neig]**2/(pdf.n_rep-1)), u.T))
     stdh = iter(np.sqrt(np.diag(cov)))
 
     # Step 3: quick test
