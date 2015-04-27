@@ -76,7 +76,8 @@ def compress_X_abs(X, neig):
 compress_X = compress_X_rel
     
 
-def main(pdf_name, neig, Q, epsilon=DEFAULT_EPSILON, no_grid=False):
+def main(pdf_name, neig, Q, epsilon=DEFAULT_EPSILON, no_grid=False, 
+         set_name=None):
 
     print "- Monte Carlo 2 Hessian conversion at", Q, "GeV"
 
@@ -128,7 +129,7 @@ def main(pdf_name, neig, Q, epsilon=DEFAULT_EPSILON, no_grid=False):
     # Step 4: exporting to LHAPDF
     if not no_grid:
         print "\n- Exporting new grid..."
-        hessian_from_lincomb(pdf, vec)
+        hessian_from_lincomb(pdf, vec, set_name=set_name)
 
     # Return estimator for programmatic reading
     return est
@@ -158,6 +159,8 @@ if __name__ == "__main__":
     parser.add_argument('--no-grid', action='store_true',
                         help="Do NOT compute and save the LHAPDF grids. "
                         "Output the error function only")
+    parser.add_argument('--set-name', default=None, help="Name of the folder "
+                        "where the resulting set will be created.")
 
     args = parser.parse_args()
     if not all((args.pdf_name, args.neig, args.Q)):
