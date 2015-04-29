@@ -34,15 +34,15 @@ def refine_relative(nnew, full_diag, part_diag, others):
         worst = np.argmin(part_diag/full_diag)
         best_eig = np.argmax(remaining[worst,:])
         ind = (np.where(~mask)[0])[best_eig]
-        
+
         part_diag += remaining[:, best_eig]
         mask[ind] = True
     return mask
-    
+
 def get_diag(U,s):
     Us = np.dot(U, np.diag(s))
     return np.sum(Us**2, axis=1)
-    
+
 def compress_X_rel(X, neig):
     U, s, V = np.linalg.svd(X, full_matrices=False)
     norm = np.sqrt(X.shape[1] - 1)
@@ -50,7 +50,7 @@ def compress_X_rel(X, neig):
     full_diag = get_diag(U, sn)
     nbig_vects =  neig // 2
     part_diag = get_diag(U[:,:nbig_vects], sn[:nbig_vects])
-    
+
     others = np.dot(U[:,nbig_vects:], np.diag(sn[nbig_vects:]))**2
     nnew = neig - nbig_vects
     mask = np.ones_like(sn, dtype=bool)
@@ -59,7 +59,7 @@ def compress_X_rel(X, neig):
 
     u = U[:,mask]
     vec = V[mask,:].T/norm
-    
+
     cov = np.dot(u, np.dot(np.diag(sn[mask]**2), u.T))
     return vec, cov
 
@@ -70,13 +70,13 @@ def compress_X_abs(X, neig):
     u = U[:,:neig]
     vec = V[:neig,:].T/norm
     cov = np.dot(u, np.dot(np.diag(sn[:neig]**2), u.T))
-    
+
     return vec, cov
 
-compress_X = compress_X_rel
-    
+compress_X = compress_X_abs
 
-def main(pdf_name, neig, Q, epsilon=DEFAULT_EPSILON, no_grid=False, 
+
+def main(pdf_name, neig, Q, epsilon=DEFAULT_EPSILON, no_grid=False,
          set_name=None):
 
     print "- Monte Carlo 2 Hessian conversion at", Q, "GeV"
@@ -97,7 +97,7 @@ def main(pdf_name, neig, Q, epsilon=DEFAULT_EPSILON, no_grid=False,
     std = np.std(X,axis=1)
     mask = (np.abs((diff-std)/diff) < epsilon)
     # maximum difference between std vs 68cl. -> create pandas array
-    print (" [Info] Keeping %d nf*nx using (1-std/68cl) <= eps =%.3f" % 
+    print (" [Info] Keeping %d nf*nx using (1-std/68cl) <= eps =%.3f" %
            (np.count_nonzero(mask), epsilon))
 
     X = X[mask,:]
@@ -122,7 +122,7 @@ def main(pdf_name, neig, Q, epsilon=DEFAULT_EPSILON, no_grid=False,
 
                 est += abs(pdf.f0[f,x] * (1-t1/t0))
                 Norm += abs(pdf.f0[f,x])
-                
+
     est /= Norm
     print "Estimator:", est
 
@@ -133,8 +133,6 @@ def main(pdf_name, neig, Q, epsilon=DEFAULT_EPSILON, no_grid=False,
 
     # Return estimator for programmatic reading
     return est
-
-argnames = {'pdf_name', 'neig', 'Q', 'epsilon', 'no_grid'}
 
 def splash():
     print "                  ____  _                   _             "
@@ -166,6 +164,5 @@ if __name__ == "__main__":
     if not all((args.pdf_name, args.neig, args.Q)):
         parser.error("Too few arguments: pdf_name, neig and Q.")
     mainargs = vars(args)
-
     splash()
     main(**mainargs)
