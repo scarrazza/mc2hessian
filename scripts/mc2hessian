@@ -14,8 +14,8 @@ import numpy as np
 import fastcache
 
 
-from common import LocalPDF, XGrid, Flavors, get_limits
-from lh import hessian_from_lincomb
+from mc2hlib.common import LocalPDF, XGrid, Flavors, get_limits
+from mc2hlib.lh import hessian_from_lincomb
 
 DEFAULT_EPSILON = 1000
 
