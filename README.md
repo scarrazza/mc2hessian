@@ -1,6 +1,7 @@
 ![alt text](https://github.com/scarrazza/mc2hessian/raw/master/extra/mc2h.png "Logo")
 
 A Monte Carlo to Hessian conversion tool for PDF sets.
+For the Genetical Algorithm methodology please visit the [gamethod branch](https://github.com/scarrazza/mc2hessian/tree/gamethod)
 
 ## Download
 
@@ -12,18 +13,30 @@ $ git clone https://github.com/scarrazza/mc2hessian.git
 
 ## Installation
 
-mc2hessian requires python2.7, numpy, pandas and LHAPDF6. If you prefer the simplest way to install all required packages is using the anaconda distribution:
+This program requires python2.7, numpy, pandas and LHAPDF6. If you
+prefer the simplest way to install all required packages is using the
+[Anaconda](https://store.continuum.io/cshop/anaconda/) distribution:
 
 ```Shell
-$ conda create --name myenv --file requirements.txt
-$ source activate myenv
+$ conda env update -n root -f environment.yml
 ```
+
 [LHAPDF](https://lhapdf.hepforge.org/) needs to be installed and working correctly with the python environment.
+
+Once all dependencies are satisfied, run:
+
+```Shell
+$ python setup.py install
+```
+
+Note that the installer script does not check for dependencies. This
+will install the `mc2hessian` program and the `mc2hlib` Python library
+in the appropriate paths.
 
 ## Usage
 
 ```Shell
-$./mc2hessian.py --help
+$./mc2hessian --help
 usage: mc2hessian.py [-h] [--epsilon EPSILON] [--no-grid] [pdf_name] [nrep] [Q]
 
 positional arguments:
