@@ -9,6 +9,7 @@ __email__ = 'stefano.carrazza@mi.infn.it'
 
 import numpy as np
 import lhapdf
+import fastcache
 
 DEFAULT_Q = 1.0
 
@@ -70,3 +71,58 @@ def get_limits(ys):
     low1s = np.min(sr,axis=0)
     low2s = np.min(sr2,axis=0)
     return Limits(m, low1s, low2s, up1s, up2s)
+
+
+@fastcache.lru_cache()
+def load_pdf(pdf_name, Q):
+    fl = Flavors()
+    xgrid = XGrid()
+    pdf = LocalPDF(pdf_name, xgrid, fl, Q)
+    return pdf, fl, xgrid
+
+def refine_relative(nnew, full_diag, part_diag, others):
+    mask = np.zeros(others.shape[1], dtype=bool)
+    #index = np.arange(others.shape[1])
+    for _ in range(nnew):
+        remaining = others[: , ~mask]
+        worst = np.argmin(part_diag/full_diag)
+        best_eig = np.argmax(remaining[worst,:])
+        ind = (np.where(~mask)[0])[best_eig]
+
+        part_diag += remaining[:, best_eig]
+        mask[ind] = True
+    return mask
+
+def get_diag(U,s):
+    Us = np.dot(U, np.diag(s))
+    return np.sum(Us**2, axis=1)
+
+def compress_X_rel(X, neig):
+    U, s, V = np.linalg.svd(X, full_matrices=False)
+    norm = np.sqrt(X.shape[1] - 1)
+    sn = s/norm
+    full_diag = get_diag(U, sn)
+    nbig_vects =  neig // 2
+    part_diag = get_diag(U[:,:nbig_vects], sn[:nbig_vects])
+
+    others = np.dot(U[:,nbig_vects:], np.diag(sn[nbig_vects:]))**2
+    nnew = neig - nbig_vects
+    mask = np.ones_like(sn, dtype=bool)
+    refmask = refine_relative(nnew, full_diag, part_diag, others)
+    mask[nbig_vects:] = refmask
+
+    u = U[:,mask]
+    vec = V[mask,:].T/norm
+
+    cov = np.dot(u, np.dot(np.diag(sn[mask]**2), u.T))
+    return vec, cov
+
+def compress_X_abs(X, neig):
+    U, s, V = np.linalg.svd(X, full_matrices=False)
+    norm = np.sqrt(X.shape[1] - 1)
+    sn = s/norm
+    u = U[:,:neig]
+    vec = V[:neig,:].T/norm
+    cov = np.dot(u, np.dot(np.diag(sn[:neig]**2), u.T))
+
+    return vec, cov
