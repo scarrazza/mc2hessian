@@ -21,23 +21,29 @@ class LocalPDF:
         self.n_rep = len(self.pdf)-1
         self.fl = fl
         self.xgrid = xgrid
-        self.Q = Q
         self.xfxQ = np.zeros(shape=(self.n_rep, fl.n, xgrid.n))
 
+        # load replicas at Q
+        self.setQ(Q)
+
+    def setQ(self,Q):
+
+        self.Q = Q
         # precomputing values
         for r in range(0,self.n_rep):
-            for f in range(fl.n):
-                for ix in range(xgrid.n):
-                    self.xfxQ[r, f, ix] = self.pdf[r+1].xfxQ(fl.id[f], xgrid.x[ix], Q)
+            for f in range(self.fl.n):
+                for ix in range(self.xgrid.n):
+                    self.xfxQ[r, f, ix] = self.pdf[r+1].xfxQ(self.fl.id[f], self.xgrid.x[ix], Q)
 
         # precomputing averages
-        self.f0 = np.zeros(shape=(fl.n, xgrid.n))
-        for f in range(fl.n):
-            for ix in range(xgrid.n):
-                self.f0[f, ix] = self.pdf[0].xfxQ(fl.id[f], xgrid.x[ix], Q)
+        self.f0 = np.zeros(shape=(self.fl.n, self.xgrid.n))
+        for f in range(self.fl.n):
+            for ix in range(self.xgrid.n):
+                self.f0[f, ix] = self.pdf[0].xfxQ(self.fl.id[f], self.xgrid.x[ix], Q)
 
         # compute std dev
         self.std = np.std(self.xfxQ, axis=0, ddof=1)
+
  
 class XGrid:
     """ The x grid points used by the test """
