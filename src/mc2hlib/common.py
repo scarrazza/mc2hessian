@@ -26,6 +26,7 @@ class LocalPDF:
         # load replicas at Q
         self.setQ(Q)
 
+    @fastcache.lru_cache()
     def setQ(self,Q):
 
         self.Q = Q
