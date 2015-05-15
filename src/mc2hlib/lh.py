@@ -136,3 +136,5 @@ def hessian_from_lincomb(pdf, V, set_name=None):
     hess_header = b"PdfType: error\nFormat: lhagrid1\n"
     for column in result.columns:
         write_replica(column + 1, hess_name, hess_header, result[column])
+
+    print ("\n")
