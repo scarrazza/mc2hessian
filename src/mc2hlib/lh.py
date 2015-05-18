@@ -107,7 +107,7 @@ def big_matrix(gridlist):
         raise ValueError("Incompatible grid specifications")
     return X
 
-def hessian_from_lincomb(pdf, V, set_name=None):
+def hessian_from_lincomb(pdf, V, set_name=None, folder = None):
 
     # preparing output folder
     neig = V.shape[1]
@@ -115,13 +115,16 @@ def hessian_from_lincomb(pdf, V, set_name=None):
     base = lhapdf.paths()[0] + "/" + pdf.pdf_name + "/" + pdf.pdf_name
     if set_name is None:
         set_name = pdf.pdf_name + "_hessian_" + str(neig)
-    if not os.path.exists(set_name): os.makedirs(set_name)
-    
+    if folder is None:
+        folder = ''
+    set_root = os.path.join(folder,set_name)
+    if not os.path.exists(set_root): os.makedirs(os.path.join(set_root))
+
     # copy replica 0
-    shutil.copy(base + "_0000.dat", set_name + "/" + set_name + "_0000.dat")
+    shutil.copy(base + "_0000.dat", set_root + "/" + set_name + "_0000.dat")
 
     inn = open(base + ".info", 'rb')
-    out = open(set_name + "/" + set_name + ".info", 'wb')
+    out = open(set_root + "/" + set_name + ".info", 'wb')
     for l in inn.readlines():
         if l.find("SetDesc:") >= 0: out.write("SetDesc: \"Hessian " + pdf.pdf_name + "_hessian\"\n")
         elif l.find("NumMembers:") >= 0: out.write("NumMembers: " + str(neig+1) + "\n")
@@ -131,7 +134,7 @@ def hessian_from_lincomb(pdf, V, set_name=None):
     out.close()
 
     headers, grids = load_all_replicas(pdf, base)
-    hess_name = set_name + '/' + set_name
+    hess_name = set_root + '/' + set_name
     result  = (big_matrix(grids).dot(V)).add(grids[0], axis=0, )
     hess_header = b"PdfType: error\nFormat: lhagrid1\n"
     for column in result.columns:
