@@ -22,7 +22,7 @@ DEFAULT_EPSILON = 1000
 compress_X = compress_X_abs
 
 def main(pdf_name, neig, Q, epsilon=DEFAULT_EPSILON, no_grid=False,
-         set_name=None):
+         set_name=None, save_csv=None):
 
     print "- Monte Carlo 2 Hessian conversion at", Q, "GeV"
 
@@ -76,6 +76,11 @@ def main(pdf_name, neig, Q, epsilon=DEFAULT_EPSILON, no_grid=False,
         print "\n- Exporting new grid..."
         hessian_from_lincomb(pdf, vec, set_name=set_name)
 
+    # Step 5: exporting linear coefficients to file
+    if save_csv is not None:
+        print "\n- Exporting linear coefficients to file..."
+        np.savetxt( save_csv, vec, delimiter=",")
+
     # Return estimator for programmatic reading
     return est
 
@@ -104,6 +109,8 @@ if __name__ == "__main__":
                         "Output the error function only")
     parser.add_argument('--set-name', default=None, help="Name of the folder "
                         "where the resulting set will be created.")
+    parser.add_argument('--save-csv', default=None, help="Name of the csv file "
+                        "where the resulting linear coefficients will be created.")
 
     args = parser.parse_args()
     if not all((args.pdf_name, args.neig, args.Q)):
