@@ -45,11 +45,11 @@ class LocalPDF:
         # compute std dev
         self.std = np.std(self.xfxQ, axis=0, ddof=1)
 
- 
+
 class XGrid:
     """ The x grid points used by the test """
     def __init__(self, xminlog=1e-5, xminlin=1e-1, xmax=1, nplog=50, nplin=50):
-        self.x = np.append(np.logspace(np.log10(xminlog), np.log10(xminlin), 
+        self.x = np.append(np.logspace(np.log10(xminlog), np.log10(xminlin),
                                        num=nplog, endpoint=False),
                            np.linspace(xminlin, xmax, num=nplin, endpoint=False)
                           )
@@ -57,8 +57,10 @@ class XGrid:
 
 class Flavors:
     """ The flavor container """
-    def __init__(self, nf=3):
+    def __init__(self, nf=3, photon=False):
         self.id = np.arange(-nf,nf+1)
+        if photon:
+            self.id = np.append(self.id, 22)
         self.n = len(self.id)
 
 
@@ -81,8 +83,8 @@ def get_limits(ys):
 
 
 @fastcache.lru_cache()
-def load_pdf(pdf_name, Q):
-    fl = Flavors()
+def load_pdf(pdf_name, Q, nf, photon):
+    fl = Flavors(nf, photon)
     xgrid = XGrid()
     pdf = LocalPDF(pdf_name, xgrid, fl, Q)
     return pdf, fl, xgrid

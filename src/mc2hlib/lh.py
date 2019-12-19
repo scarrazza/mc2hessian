@@ -79,12 +79,12 @@ def _rep_to_buffer(out, header, subgrids):
         out.write(b'\n')
         #Integer format
         ind = g.index.get_level_values(3).unique()
-        np.savetxt(out, ind, delimiter=' ', fmt="%d", 
+        np.savetxt(out, ind, delimiter=' ', fmt="%d",
                       newline=' ')
         out.write(b'\n ')
         #Reshape so printing is easy
-        reshaped = g.reshape((len(g.groupby(level=1))*len(g.groupby(level=2)), 
-                              len(g.groupby(level=3))))
+        reshaped = g.values.reshape((len(g.groupby(level=1))*len(g.groupby(level=2)),
+                                     len(g.groupby(level=3))))
         np.savetxt(out, reshaped, delimiter=" ", newline="\n ", fmt='%14.7E')
         out.write(sep)
 
@@ -123,11 +123,11 @@ def hessian_from_lincomb(pdf, V, set_name=None, folder = None):
     # copy replica 0
     shutil.copy(base + "_0000.dat", set_root + "/" + set_name + "_0000.dat")
 
-    inn = open(base + ".info", 'rb')
-    out = open(set_root + "/" + set_name + ".info", 'wb')
+    inn = open(base + ".info", 'r')
+    out = open(set_root + "/" + set_name + ".info", 'w')
     for l in inn.readlines():
-        if l.find("SetDesc:") >= 0: out.write("SetDesc: \"Hessian " + pdf.pdf_name + "_hessian\"\n")
-        elif l.find("NumMembers:") >= 0: out.write("NumMembers: " + str(neig+1) + "\n")
+        if l.find("SetDesc:") >= 0: out.write(f"SetDesc: \"Hessian {pdf.pdf_name}_hessian\"\n")
+        elif l.find("NumMembers:") >= 0: out.write(f"NumMembers: {neig+1}\n")
         elif l.find("ErrorType: replicas") >= 0: out.write("ErrorType: symmhessian\n")
         else: out.write(l)
     inn.close()

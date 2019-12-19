@@ -22,19 +22,19 @@ DEFAULT_EPSILON = 1000
 compress_X = compress_X_abs
 
 def main(pdf_name, neig, Q, epsilon=DEFAULT_EPSILON, no_grid=False,
-         set_name=None, save_csv=None):
+         set_name=None, save_csv=None, max_nf=3, photon=False):
 
-    print "- Monte Carlo 2 Hessian conversion at", Q, "GeV"
+    print(f"- Monte Carlo 2 Hessian conversion at {Q} GeV")
 
     # Loading basic elements
-    pdf, fl, xgrid = load_pdf(pdf_name, Q)
+    pdf, fl, xgrid = load_pdf(pdf_name, Q, max_nf, photon)
     nx = xgrid.n
     nf = fl.n
 
     # Step 1: create pdf covmat
-    print "\n- Building PDF covariance matrix:"
+    print("\n- Building PDF covariance matrix:")
     X = (pdf.xfxQ.reshape(pdf.n_rep, nx*nf) - pdf.f0.reshape(nx*nf)).T
-    print " [Done] "
+    print(" [Done] ")
 
     #Epsilon
     l = get_limits(X.T)
@@ -52,7 +52,7 @@ def main(pdf_name, neig, Q, epsilon=DEFAULT_EPSILON, no_grid=False,
     stdh = iter(np.sqrt(np.diag(cov)))
 
     # Step 3: quick test
-    print "\n- Quick test:"
+    print ("\n- Quick test:")
     rmask = mask.reshape(fl.n, xgrid.n)
     est = Norm = 0
     for f in range(fl.n):
@@ -61,36 +61,36 @@ def main(pdf_name, neig, Q, epsilon=DEFAULT_EPSILON, no_grid=False,
                 t0 = pdf.std[f,x]
                 t1 = next(stdh)
 
-                print "1-sigma MonteCarlo (fl,x,sigma):", fl.id[f], xgrid.x[x], t0
-                print "1-sigma Hessian    (fl,x,sigma):", fl.id[f], xgrid.x[x], t1
-                print "Ratio:", t1/t0
+                print(f"1-sigma MonteCarlo (fl,x,sigma): %d, %f, %f" % (fl.id[f], xgrid.x[x], t0))
+                print(f"1-sigma Hessian    (fl,x,sigma): %d, %f, %f" % (fl.id[f], xgrid.x[x], t1))
+                print(f"Ratio: {t1/t0}")
 
                 est += abs(pdf.f0[f,x] * (1-t1/t0))
                 Norm += abs(pdf.f0[f,x])
 
     est /= Norm
-    print "Estimator:", est
+    print(f"Estimator: {est}")
 
     # Step 4: exporting to LHAPDF
     if not no_grid:
-        print "\n- Exporting new grid..."
+        print("\n- Exporting new grid...")
         hessian_from_lincomb(pdf, vec, set_name=set_name)
 
     # Step 5: exporting linear coefficients to file
     if save_csv is not None:
-        print "\n- Exporting linear coefficients to file..."
+        print("\n- Exporting linear coefficients to file...")
         np.savetxt( save_csv, vec, delimiter=",")
 
     # Return estimator for programmatic reading
     return est
 
 def splash():
-    print "                  ____  _                   _             "
-    print "   _ __ ___   ___|___ \| |__   ___  ___ ___(_) __ _ _ __  "
-    print "  | '_ ` _ \ / __| __) | '_ \ / _ \/ __/ __| |/ _` | '_ \ "
-    print "  | | | | | | (__ / __/| | | |  __/\__ \__ \ | (_| | | | |"
-    print "  |_| |_| |_|\___|_____|_| |_|\___||___/___/_|\__,_|_| |_|"
-    print "\n  __v" + __version__ + "__ Author: Stefano Carrazza\n"
+    print("                  ____  _                   _             ")
+    print("   _ __ ___   ___|___ \| |__   ___  ___ ___(_) __ _ _ __  ")
+    print("  | '_ ` _ \ / __| __) | '_ \ / _ \/ __/ __| |/ _` | '_ \ ")
+    print("  | | | | | | (__ / __/| | | |  __/\__ \__ \ | (_| | | | |")
+    print("  |_| |_| |_|\___|_____|_| |_|\___||___/___/_|\__,_|_| |_|")
+    print(f"\n  __v{__version__}__ Author: Stefano Carrazza\n")
 
 
 if __name__ == "__main__":
@@ -111,6 +111,9 @@ if __name__ == "__main__":
                         "where the resulting set will be created.")
     parser.add_argument('--save-csv', default=None, help="Name of the csv file "
                         "where the resulting linear coefficients will be created.")
+    parser.add_argument('--max-nf', default=3, type=int,
+                         help="Number of flavours entering the covmat.")
+    parser.add_argument('--photon', action='store_true', help="Enable photon PDF.")
 
     args = parser.parse_args()
     if not all((args.pdf_name, args.neig, args.Q)):
