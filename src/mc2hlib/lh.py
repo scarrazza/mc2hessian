@@ -15,7 +15,7 @@ import pandas as pd
 
 def split_sep(f):
     for line in f:
-        if line.startswith(b'---'):
+        if line.startswith(b'---') or line.startswith(b' ---'):
             break
         yield line
 
