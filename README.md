@@ -13,21 +13,11 @@ $ git clone https://github.com/scarrazza/mc2hessian.git
 
 ## Installation
 
-This program requires python2.7, numpy, pandas and
+This program requires python3, numpy, pandas and
 LHAPDF6. [LHAPDF](https://lhapdf.hepforge.org/) needs to be installed
 and working correctly with the python environment. If you prefer the
 simplest way to install all required packages is using the
-[Anaconda](https://store.continuum.io/cshop/anaconda/) distribution:
-
-```Shell
-$ conda env update -n root -f environment.yml
-```
-
-Once all dependencies are satisfied, run:
-
-```Shell
-$ python setup.py install
-```
+[Anaconda](https://store.continuum.io/cshop/anaconda/) distribution.
 
 Note that the installer script does not check for dependencies. This
 will install the `mc2hessian` program and the `mc2hlib` Python library
